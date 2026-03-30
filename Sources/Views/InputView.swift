@@ -14,7 +14,7 @@ public struct InputView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.highContrast) private var highContrast
 
-    @ObservedObject var inputState: MessageInputState
+    var inputState: MessageInputState
     let connectionState: ConnectionState
     let isStreaming: Bool
     let projectPath: String?
@@ -61,7 +61,10 @@ public struct InputView: View {
 
                 // Text input
                 TextInputArea(
-                    text: $inputState.text,
+                    text: Binding(
+                        get: { inputState.text },
+                        set: { inputState.text = $0 }
+                    ),
                     isFocused: $isInputFocused,
                     isSending: inputState.isSending,
                     isStreaming: isStreaming,
@@ -147,6 +150,10 @@ struct TextInputArea: View {
                 .scrollContentBackground(.hidden)
                 .frame(minHeight: 36, maxHeight: WindowDimensions.inputMaxHeight - 48)
                 .disabled(connectionState != .connected || isStreaming)
+                .onAppear {
+                    // 自动聚焦输入框
+                    isFocused.wrappedValue = true
+                }
         }
         .padding(.horizontal, Spacing.sm.rawValue)
         .padding(.vertical, Spacing.xs.rawValue)

@@ -107,10 +107,11 @@ public struct ChatMessage: Identifiable, Codable, Sendable {
 // MARK: - Streaming Message
 
 /// A message that is being streamed
-public final class StreamingMessage: ObservableObject, @unchecked Sendable {
-    @Published public var content: String = ""
-    @Published public var isComplete: Bool = false
-    @Published public var toolCalls: [ToolCallDisplay] = []
+@Observable
+public final class StreamingMessage: Sendable {
+    public var content: String = ""
+    public var isComplete: Bool = false
+    public var toolCalls: [ToolCallDisplay] = []
 
     public let messageId: UUID
     public let startTime: Date
@@ -146,11 +147,12 @@ public final class StreamingMessage: ObservableObject, @unchecked Sendable {
 // MARK: - Input State
 
 /// State for the message input area
-public final class MessageInputState: ObservableObject, @unchecked Sendable {
-    @Published public var text: String = ""
-    @Published public var isSending: Bool = false
-    @Published public var isStreaming: Bool = false
-    @Published public var cursorPosition: Int = 0
+@Observable
+public final class MessageInputState: Sendable {
+    public var text: String = ""
+    public var isSending: Bool = false
+    public var isStreaming: Bool = false
+    public var cursorPosition: Int = 0
 
     public init() {}
 

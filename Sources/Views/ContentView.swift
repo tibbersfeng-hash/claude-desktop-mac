@@ -110,6 +110,10 @@ public struct ContentView: View {
             // Auto-connect on launch
             Task {
                 await chatViewModel.connect()
+                // Create a default session if none exists
+                if sessionViewModel.sessions.isEmpty {
+                    sessionViewModel.createSession()
+                }
             }
         }
     }

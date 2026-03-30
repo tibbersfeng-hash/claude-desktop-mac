@@ -228,7 +228,7 @@ struct ErrorBanner: View {
 
 struct StreamingMessageView: View {
     @Environment(\.colorScheme) private var colorScheme
-    @ObservedObject var streamingMessage: StreamingMessage
+    @Bindable var streamingMessage: StreamingMessage
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.md.rawValue) {

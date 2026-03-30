@@ -12,6 +12,7 @@ import State
 import Models
 import CLIConnector
 import ErrorHandling
+import CLIDetector
 
 // MARK: - Chat ViewModel
 
@@ -64,7 +65,8 @@ public final class ChatViewModel {
 
     // MARK: - Private Properties
 
-    private let cliConnector: CLIConnector
+    private let executionService: CLIExecutionService
+    private let detector: CLIDetector
     private var cancellables = Set<AnyCancellable>()
 
     // MARK: - Computed Properties
@@ -91,8 +93,9 @@ public final class ChatViewModel {
 
     // MARK: - Initialization
 
-    public init(cliConnector: CLIConnector = .shared) {
-        self.cliConnector = cliConnector
+    public init(executionService: CLIExecutionService = CLIExecutionService(), detector: CLIDetector = .shared) {
+        self.executionService = executionService
+        self.detector = detector
         self.inputState = MessageInputState()
 
         setupBindings()
@@ -101,45 +104,19 @@ public final class ChatViewModel {
     // MARK: - Setup
 
     private func setupBindings() {
-        // Subscribe to connection state
-        cliConnector.$connectionState
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] state in
-                self?.connectionState = state
-            }
-            .store(in: &cancellables)
-
-        // Subscribe to detection result
-        cliConnector.$detectionResult
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] result in
-                self?.cliVersion = result?.version
-            }
-            .store(in: &cancellables)
-
-        // Subscribe to streaming response
-        cliConnector.responseHandler.responsePublisher
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] response in
-                self?.handleStreamingResponse(response)
-            }
-            .store(in: &cancellables)
-
-        // Subscribe to streaming deltas
-        cliConnector.responseHandler.deltaPublisher
+        // Subscribe to streaming deltas from execution service
+        executionService.deltaPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] delta in
                 self?.handleDelta(delta)
             }
             .store(in: &cancellables)
 
-        // Subscribe to errors
-        cliConnector.$lastError
+        // Subscribe to execution state
+        executionService.statePublisher
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] errorInfo in
-                if let error = errorInfo {
-                    self?.handleError(error)
-                }
+            .sink { [weak self] state in
+                self?.handleExecutionState(state)
             }
             .store(in: &cancellables)
     }
@@ -181,12 +158,26 @@ public final class ChatViewModel {
 
         // Start streaming message for response
         streamingMessage = StreamingMessage()
+        inputState.startStreaming()
 
         do {
-            // Send to CLI
-            try await cliConnector.send(text)
+            // Execute with CLI
+            let result = try await executionService.execute(
+                message: text,
+                workingDirectory: projectPath
+            )
 
-            inputState.startStreaming()
+            // Update streaming message with final content
+            streamingMessage?.content = result.content
+            streamingMessage?.complete()
+
+            // Add assistant message
+            let assistantMessage = ChatMessage.assistant(result.content)
+            messages.append(assistantMessage)
+
+            streamingMessage = nil
+            inputState.finishSending()
+
         } catch {
             handleError(error)
             inputState.finishSending()
@@ -198,22 +189,19 @@ public final class ChatViewModel {
     public func interruptStream() async {
         guard isStreaming else { return }
 
-        do {
-            try await cliConnector.interrupt()
+        // Cancel the execution
+        executionService.cancel()
 
-            // Complete the streaming message with current content
-            streamingMessage?.complete()
+        // Complete the streaming message with current content
+        streamingMessage?.complete()
 
-            if let streaming = streamingMessage {
-                let assistantMessage = streaming.toChatMessage()
-                messages.append(assistantMessage)
-            }
-
-            streamingMessage = nil
-            inputState.finishSending()
-        } catch {
-            handleError(error)
+        if let streaming = streamingMessage, !streaming.content.isEmpty {
+            let assistantMessage = streaming.toChatMessage()
+            messages.append(assistantMessage)
         }
+
+        streamingMessage = nil
+        inputState.finishSending()
     }
 
     /// Retry the last message
@@ -229,6 +217,9 @@ public final class ChatViewModel {
         // Set input and send
         inputState.text = lastUserMessage.content
         messages.removeLast() // Remove the user message too, it will be re-added
+
+        // Reset session for retry
+        executionService.resetSession()
         await sendMessage()
     }
 
@@ -271,42 +262,42 @@ public final class ChatViewModel {
 
     // MARK: - Connection
 
-    /// Connect to CLI
+    /// Connect to CLI (detect CLI presence)
     public func connect() async {
-        do {
-            try await cliConnector.quickConnect()
-        } catch {
-            handleError(error)
+        let result = await detector.detect()
+
+        if result.isInstalled {
+            connectionState = .connected
+            cliVersion = result.version
+        } else {
+            connectionState = .error
+            errorMessage = "Claude Code CLI not found. Please install it first."
         }
     }
 
     /// Disconnect from CLI
     public func disconnect() async {
-        await cliConnector.disconnect()
+        executionService.resetSession()
+        connectionState = .disconnected
     }
 
     // MARK: - Private Handlers
 
-    private func handleStreamingResponse(_ response: StreamingResponse) {
-        guard let streaming = streamingMessage else { return }
-
-        streaming.content = response.content
-
-        // Add any tool calls
-        for toolCall in response.toolCalls {
-            if !streaming.toolCalls.contains(where: { $0.id == toolCall.id }) {
-                let display = ToolCallDisplay(from: toolCall)
-                streaming.toolCalls.append(display)
-            }
-        }
-
-        // If complete, add to messages
-        if response.isComplete {
-            streaming.complete()
-            let assistantMessage = streaming.toChatMessage()
-            messages.append(assistantMessage)
-            self.streamingMessage = nil
+    private func handleExecutionState(_ state: ExecutionState) {
+        switch state {
+        case .idle:
+            break
+        case .executing:
+            connectionState = .connected
+        case .completed:
             inputState.finishSending()
+        case .error(let message):
+            errorMessage = message
+            inputState.finishSending()
+            streamingMessage = nil
+        case .cancelled:
+            inputState.finishSending()
+            streamingMessage = nil
         }
     }
 
@@ -320,7 +311,9 @@ public final class ChatViewModel {
     }
 
     private func handleError(_ error: Error) {
-        if let connectionError = error as? ConnectionError {
+        if let executionError = error as? ExecutionError {
+            errorMessage = executionError.errorDescription
+        } else if let connectionError = error as? ConnectionError {
             errorMessage = connectionError.errorDescription
         } else {
             errorMessage = error.localizedDescription
