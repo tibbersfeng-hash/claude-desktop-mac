@@ -5,6 +5,41 @@
 
 import SwiftUI
 import Combine
+import Theme
+import Shortcuts
+
+// MARK: - Button Style Type Aliases
+// These work around the ambiguous .secondary/.primary static methods
+
+private struct AppSecondaryButtonStyle: ButtonStyle {
+    @Environment(\.colorScheme) var colorScheme
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+            .padding(.horizontal, Spacing.lg.rawValue)
+            .padding(.vertical, Spacing.sm.rawValue)
+            .background(Color.bgTertiary(scheme: colorScheme))
+            .cornerRadius(CornerRadius.md.rawValue)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.easeInOut(duration: AnimationDuration.fast.rawValue), value: configuration.isPressed)
+    }
+}
+
+private struct AppPrimaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 14, weight: .medium))
+            .foregroundColor(.white)
+            .padding(.horizontal, Spacing.lg.rawValue)
+            .padding(.vertical, Spacing.sm.rawValue)
+            .background(Color.accentPrimary)
+            .cornerRadius(CornerRadius.md.rawValue)
+            .opacity(configuration.isPressed ? 0.8 : 1.0)
+            .animation(.easeInOut(duration: AnimationDuration.fast.rawValue), value: configuration.isPressed)
+    }
+}
 
 // MARK: - Shortcut Registry
 
@@ -226,14 +261,14 @@ public struct ShortcutSettingsView: View {
                 Button("Reset All") {
                     registry.resetAllToDefaults()
                 }
-                .buttonStyle(.secondary)
+                .buttonStyle(AppSecondaryButtonStyle())
 
                 Spacer()
 
                 Button("Done") {
                     dismiss()
                 }
-                .buttonStyle(.primary)
+                .buttonStyle(AppPrimaryButtonStyle())
             }
             .padding()
             .background(Color.bgSecondary(scheme: colorScheme))

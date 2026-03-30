@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(swift build:*)",
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(xcodebuild -scheme Claude_Desktop_Mac -configuration Debug build)",
+      "Bash(xcodebuild -scheme ClaudeDesktopMac -destination 'platform=macOS' build)",
+      "Bash(swift test:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

@@ -8,16 +8,19 @@ import Foundation
 // Notifications Module
 public enum Notifications {
     /// Initialize notification system
+    @MainActor
     public static func initialize() {
         NotificationManager.shared.requestAuthorization()
     }
 
     /// Check authorization status
+    @MainActor
     public static func checkAuthorization() {
         NotificationManager.shared.checkAuthorizationStatus()
     }
 
     /// Send a response notification
+    @MainActor
     public static func notifyResponse(
         sessionId: UUID,
         title: String,
@@ -33,6 +36,7 @@ public enum Notifications {
     }
 
     /// Send an input needed notification
+    @MainActor
     public static func notifyInputNeeded(
         sessionId: UUID,
         message: String,
@@ -46,6 +50,7 @@ public enum Notifications {
     }
 
     /// Send a code notification
+    @MainActor
     public static func notifyCode(
         sessionId: UUID,
         code: String,
@@ -61,6 +66,7 @@ public enum Notifications {
     }
 
     /// Send a task complete notification
+    @MainActor
     public static func notifyTaskComplete(
         sessionId: UUID,
         taskName: String,
@@ -74,6 +80,7 @@ public enum Notifications {
     }
 
     /// Send an error notification
+    @MainActor
     public static func notifyError(
         title: String,
         message: String,
@@ -87,21 +94,25 @@ public enum Notifications {
     }
 
     /// Clear all notifications
+    @MainActor
     public static func clearAll() {
         NotificationManager.shared.clearAllNotifications()
     }
 
     /// Update badge count
+    @MainActor
     public static func updateBadge(count: Int) {
         NotificationManager.shared.updateBadge(count: count)
     }
 
     /// Clear badge
+    @MainActor
     public static func clearBadge() {
         NotificationManager.shared.clearBadge()
     }
 
     /// Set notification handlers
+    @MainActor
     public static func setHandlers(
         onViewSession: ((UUID) -> Void)? = nil,
         onReply: ((UUID, String) -> Void)? = nil,
@@ -116,6 +127,7 @@ public enum Notifications {
     }
 
     /// Handle session event for notifications
+    @MainActor
     public static func handleEvent(_ event: SessionEvent) {
         NotificationHandler.shared.handleEvent(event)
     }

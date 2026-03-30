@@ -5,6 +5,7 @@
 
 import SwiftUI
 import AppKit
+import Theme
 
 // MARK: - MenuBar Status
 

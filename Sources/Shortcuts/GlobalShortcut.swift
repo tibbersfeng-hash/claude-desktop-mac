@@ -82,7 +82,7 @@ public final class GlobalShortcutHandler {
     }
 
     private func handleKeyEvent(_ event: NSEvent) -> Bool {
-        let modifiers = event.modifierFlags
+        let modifiers = NSEvent.ModifierFlags(rawValue: event.modifierFlags.rawValue)
 
         // Get key character
         guard let characters = event.charactersIgnoringModifiers else { return false }
@@ -137,12 +137,16 @@ public final class GlobalShortcutHandler {
 extension NSApplicationDelegate {
     /// Set up global shortcuts in application delegate
     public func setupGlobalShortcuts() {
-        GlobalShortcutHandler.shared.startMonitoring()
+        Task { @MainActor in
+            GlobalShortcutHandler.shared.startMonitoring()
+        }
     }
 
     /// Tear down global shortcuts
     public func teardownGlobalShortcuts() {
-        GlobalShortcutHandler.shared.stopMonitoring()
+        Task { @MainActor in
+            GlobalShortcutHandler.shared.stopMonitoring()
+        }
     }
 }
 
@@ -234,22 +238,22 @@ public struct QuickActionsView: View {
             // Search field
             HStack {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(Color.fgTertiary(scheme: colorScheme))
+                    .foregroundColor(ShortcutColors.fgTertiary(scheme: colorScheme))
 
                 TextField("Search actions...", text: $searchText)
                     .textFieldStyle(.plain)
-                    .font(.bodyText)
+                    .font(.body)
 
                 if !searchText.isEmpty {
                     Button(action: { searchText = "" }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(Color.fgTertiary(scheme: colorScheme))
+                            .foregroundColor(ShortcutColors.fgTertiary(scheme: colorScheme))
                     }
                     .buttonStyle(.plain)
                 }
             }
             .padding()
-            .background(Color.bgSecondary(scheme: colorScheme))
+            .background(ShortcutColors.bgSecondary(scheme: colorScheme))
 
             Divider()
 
@@ -275,9 +279,9 @@ public struct QuickActionsView: View {
             .frame(maxHeight: 300)
         }
         .frame(width: 400)
-        .background(Color.bgPrimary(scheme: colorScheme))
-        .cornerRadius(CornerRadius.lg.rawValue)
-        .shadow(AppShadow.lg)
+        .background(ShortcutColors.bgPrimary(scheme: colorScheme))
+        .cornerRadius(ShortcutStyles.CornerRadius.lg.rawValue)
+        .shadow(ShortcutStyles.AppShadow.lg)
     }
 
     private var filteredActions: [ShortcutAction] {
@@ -307,11 +311,11 @@ private struct QuickActionRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(action.displayName)
                     .font(.callout)
-                    .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+                    .foregroundColor(ShortcutColors.fgPrimary(scheme: colorScheme))
 
                 Text(action.description)
                     .font(.caption)
-                    .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+                    .foregroundColor(ShortcutColors.fgSecondary(scheme: colorScheme))
             }
 
             Spacer()
@@ -321,17 +325,17 @@ private struct QuickActionRow: View {
                 ForEach(shortcutKeys, id: \.self) { key in
                     Text(key)
                         .font(.caption)
-                        .foregroundColor(Color.fgTertiary(scheme: colorScheme))
+                        .foregroundColor(ShortcutColors.fgTertiary(scheme: colorScheme))
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
-                        .background(Color.bgTertiary(scheme: colorScheme))
-                        .cornerRadius(CornerRadius.sm.rawValue)
+                        .background(ShortcutColors.bgTertiary(scheme: colorScheme))
+                        .cornerRadius(ShortcutStyles.CornerRadius.sm.rawValue)
                 }
             }
         }
-        .padding(.horizontal, Spacing.md.rawValue)
-        .padding(.vertical, Spacing.sm.rawValue)
-        .background(isSelected || isHovered ? Color.bgHover(scheme: colorScheme) : Color.clear)
+        .padding(.horizontal, ShortcutStyles.Spacing.md.rawValue)
+        .padding(.vertical, ShortcutStyles.Spacing.sm.rawValue)
+        .background(isSelected || isHovered ? ShortcutColors.bgHover(scheme: colorScheme) : Color.clear)
         .contentShape(Rectangle())
         .onTapGesture(perform: onSelect)
         .onHover { isHovered = $0 }
@@ -349,6 +353,7 @@ private struct QuickActionRow: View {
 
 extension Commands {
     /// Create commands from shortcuts
+    @CommandsBuilder
     public static func shortcutCommands() -> some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Session") {

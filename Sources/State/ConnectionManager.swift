@@ -5,6 +5,12 @@
 
 import Foundation
 import Combine
+import CLIDetector
+import CLIManager
+import Communication
+import Streaming
+import Protocol
+import ErrorHandling
 
 // MARK: - Connection Manager
 

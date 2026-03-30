@@ -152,6 +152,8 @@ public final class MessageInputState: ObservableObject, @unchecked Sendable {
     @Published public var isStreaming: Bool = false
     @Published public var cursorPosition: Int = 0
 
+    public init() {}
+
     public var canSend: Bool {
         !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && !isStreaming
     }

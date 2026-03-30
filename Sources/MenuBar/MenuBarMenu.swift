@@ -5,6 +5,9 @@
 
 import SwiftUI
 import AppKit
+import Theme
+import Models
+import Project
 
 // MARK: - Menu Item View
 

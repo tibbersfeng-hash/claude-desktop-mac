@@ -109,14 +109,28 @@ public enum Performance {
     /// Trigger memory cleanup
     public static func cleanupMemory() {
         Task { @MainActor in
-            MemoryManager.shared.forceCleanup()
-            CacheManager.shared.clearAll()
+            await MemoryManager.shared.forceCleanup()
+            try? await CacheManager.shared.clearAll()
         }
     }
 
-    /// Get available memory
+    /// Get available memory (estimated from vm_statistics)
     public static var availableMemory: UInt64 {
-        return os_proc_available_memory()
+        var vmStats = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+
+        let result = withUnsafeMutablePointer(to: &vmStats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+
+        guard result == KERN_SUCCESS else {
+            return ProcessInfo.processInfo.physicalMemory
+        }
+
+        let free = UInt64(vmStats.free_count) * UInt64(vm_page_size)
+        return free
     }
 
     /// Get total physical memory

@@ -79,14 +79,14 @@ public enum TimeRange: String, Codable, CaseIterable, Identifiable, Sendable {
 // MARK: - Search Result
 
 /// A single search result
-public struct SearchResult: Identifiable, Codable, Sendable {
+public struct SearchResult: Identifiable, Sendable {
     public let id: UUID
     public let sessionId: UUID
     public let messageId: UUID
     public let sessionTitle: String
     public let projectName: String
     public let matchedContent: String
-    public let highlightRanges: [Range<String.Index>]
+    public let highlightRanges: [(Int, Int)]  // Store as (offset, length) pairs for Codable
     public let timestamp: Date
     public let relevanceScore: Double
 
@@ -97,7 +97,7 @@ public struct SearchResult: Identifiable, Codable, Sendable {
         sessionTitle: String,
         projectName: String,
         matchedContent: String,
-        highlightRanges: [Range<String.Index>],
+        highlightRanges: [(Int, Int)],
         timestamp: Date,
         relevanceScore: Double = 1.0
     ) {
@@ -116,14 +116,59 @@ public struct SearchResult: Identifiable, Codable, Sendable {
     public func highlightedContent() -> AttributedString {
         var result = AttributedString(matchedContent)
 
-        for range in highlightRanges {
-            if let lowerBound = AttributedString.Index(range.lowerBound, within: result),
-               let upperBound = AttributedString.Index(range.upperBound, within: result) {
-                result[lowerBound..<upperBound].backgroundColor = .yellow.opacity(0.3)
-            }
+        for (offset, length) in highlightRanges {
+            let startIndex = result.characters.index(result.startIndex, offsetBy: offset)
+            let endIndex = result.characters.index(startIndex, offsetBy: length)
+            result[startIndex..<endIndex].backgroundColor = .yellow.opacity(0.3)
         }
 
         return result
+    }
+}
+
+// MARK: - SearchResult Codable
+
+extension SearchResult: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case id, sessionId, messageId, sessionTitle, projectName
+        case matchedContent, highlightRanges, timestamp, relevanceScore
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        sessionId = try container.decode(UUID.self, forKey: .sessionId)
+        messageId = try container.decode(UUID.self, forKey: .messageId)
+        sessionTitle = try container.decode(String.self, forKey: .sessionTitle)
+        projectName = try container.decode(String.self, forKey: .projectName)
+        matchedContent = try container.decode(String.self, forKey: .matchedContent)
+
+        // Decode highlight ranges as array of [Int] pairs
+        let rangeArrays = try container.decode([[Int]].self, forKey: .highlightRanges)
+        highlightRanges = rangeArrays.compactMap { array in
+            guard array.count == 2 else { return nil }
+            return (array[0], array[1])
+        }
+
+        timestamp = try container.decode(Date.self, forKey: .timestamp)
+        relevanceScore = try container.decode(Double.self, forKey: .relevanceScore)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(sessionId, forKey: .sessionId)
+        try container.encode(messageId, forKey: .messageId)
+        try container.encode(sessionTitle, forKey: .sessionTitle)
+        try container.encode(projectName, forKey: .projectName)
+        try container.encode(matchedContent, forKey: .matchedContent)
+
+        // Encode highlight ranges as array of [Int] pairs
+        let rangeArrays = highlightRanges.map { [$0.0, $0.1] }
+        try container.encode(rangeArrays, forKey: .highlightRanges)
+
+        try container.encode(timestamp, forKey: .timestamp)
+        try container.encode(relevanceScore, forKey: .relevanceScore)
     }
 }
 
@@ -186,17 +231,17 @@ public actor HistorySearchService {
 
             // Calculate match score
             var matchScore = 0.0
-            var highlightRanges: [Range<String.Index>] = []
+            var highlightRanges: [(Int, Int)] = []
 
             for word in keywordWords {
                 // Search in content
                 if let range = content.range(of: word) {
                     matchScore += 1.0
 
-                    // Map to original string range
-                    let lowerIndex = entry.content.index(entry.content.startIndex, offsetBy: content.distance(from: content.startIndex, to: range.lowerBound))
-                    let upperIndex = entry.content.index(entry.content.startIndex, offsetBy: content.distance(from: content.startIndex, to: range.upperBound))
-                    highlightRanges.append(lowerIndex..<upperIndex)
+                    // Calculate offset and length for the range
+                    let offset = content.distance(from: content.startIndex, to: range.lowerBound)
+                    let length = content.distance(from: range.lowerBound, to: range.upperBound)
+                    highlightRanges.append((offset, length))
                 }
 
                 // Bonus for title match

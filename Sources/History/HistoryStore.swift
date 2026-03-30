@@ -5,6 +5,7 @@
 
 import Foundation
 import Combine
+import Models
 
 // MARK: - History Store
 

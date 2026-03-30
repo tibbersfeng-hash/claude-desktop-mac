@@ -57,7 +57,12 @@ public struct ClaudeDesktopConfiguration {
 
 // MARK: - Preview
 
-#Preview {
-    ClaudeDesktopApp()
-        .frame(width: WindowDimensions.defaultWidth, height: WindowDimensions.defaultHeight)
+#if DEBUG
+@available(macOS 14.0, *)
+struct ClaudeDesktopUI_Previews: PreviewProvider {
+    static var previews: some View {
+        ClaudeDesktopApp()
+            .frame(width: WindowDimensions.defaultWidth, height: WindowDimensions.defaultHeight)
+    }
 }
+#endif

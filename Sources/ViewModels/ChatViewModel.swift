@@ -9,6 +9,9 @@ import Combine
 import Protocol
 import Streaming
 import State
+import Models
+import CLIConnector
+import ErrorHandling
 
 // MARK: - Chat ViewModel
 
@@ -101,7 +104,10 @@ public final class ChatViewModel {
         // Subscribe to connection state
         cliConnector.$connectionState
             .receive(on: DispatchQueue.main)
-            .assign(to: &$connectionState)
+            .sink { [weak self] state in
+                self?.connectionState = state
+            }
+            .store(in: &cancellables)
 
         // Subscribe to detection result
         cliConnector.$detectionResult

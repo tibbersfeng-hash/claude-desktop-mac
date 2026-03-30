@@ -149,7 +149,7 @@ extension Notification.Name {
 
 extension View {
     /// Add keyboard shortcut handling to a view
-    public func shortcutHandler(_ manager: ShortcutManager = .shared) -> some View {
+    public func shortcutHandler(_ manager: ShortcutManager) -> some View {
         self.onReceive(NotificationCenter.default.publisher(for: .shortcutTriggered)) { notification in
             if let actionRaw = notification.userInfo?["action"] as? String,
                let action = ShortcutAction(rawValue: actionRaw) {
@@ -161,7 +161,7 @@ extension View {
     /// Add a keyboard shortcut for an action
     public func keyboardShortcut(
         _ action: ShortcutAction,
-        manager: ShortcutManager = .shared,
+        manager: ShortcutManager,
         perform handler: @escaping () -> Void
     ) -> some View {
         let definition = manager.shortcut(for: action)
@@ -178,7 +178,7 @@ extension View {
     private func onKeyDown(key: String, modifiers: [ModifierKey], perform handler: @escaping () -> Void) -> some View {
         self.onKeyPress(KeyEquivalent(Character(key))) {
             // Check modifiers
-            let currentModifiers = NSEvent.modifierFlags
+            let currentModifiers = Self.currentModifierFlags
             let requiredModifiers = modifiers.map { $0.NSEventModifierFlags }.reduce(NSEvent.ModifierFlags(), { $0.union($1) })
 
             if currentModifiers == requiredModifiers {
@@ -188,13 +188,8 @@ extension View {
             return .ignored
         }
     }
-}
 
-// MARK: - NSEvent Extension
-
-extension NSEvent {
-    /// Current modifier flags
-    static var modifierFlags: ModifierFlags {
+    private static var currentModifierFlags: NSEvent.ModifierFlags {
         NSApp.currentEvent?.modifierFlags ?? []
     }
 }
@@ -224,19 +219,19 @@ public struct KeyboardShortcutsView: View {
                 Button(action: { dismiss() }) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2)
-                        .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+                        .foregroundColor(ShortcutColors.fgSecondary(scheme: colorScheme))
                 }
                 .buttonStyle(.plain)
             }
             .padding()
-            .background(Color.bgSecondary(scheme: colorScheme))
+            .background(ShortcutColors.bgSecondary(scheme: colorScheme))
 
             Divider()
 
             HStack(spacing: 0) {
                 // Category sidebar
                 ScrollView {
-                    VStack(spacing: Spacing.xs.rawValue) {
+                    VStack(spacing: ShortcutStyles.Spacing.xs.rawValue) {
                         ForEach(ShortcutCategory.allCases) { category in
                             CategoryButton(
                                 category: category,
@@ -246,16 +241,16 @@ public struct KeyboardShortcutsView: View {
                             )
                         }
                     }
-                    .padding(Spacing.sm.rawValue)
+                    .padding(ShortcutStyles.Spacing.sm.rawValue)
                 }
                 .frame(width: 150)
-                .background(Color.bgSecondary(scheme: colorScheme))
+                .background(ShortcutColors.bgSecondary(scheme: colorScheme))
 
                 Divider()
 
                 // Shortcuts list
                 ScrollView {
-                    VStack(alignment: .leading, spacing: Spacing.sm.rawValue) {
+                    VStack(alignment: .leading, spacing: ShortcutStyles.Spacing.sm.rawValue) {
                         ForEach(selectedCategory.shortcuts) { action in
                             ShortcutRow(
                                 action: action,
@@ -285,10 +280,10 @@ public struct KeyboardShortcutsView: View {
                 .buttonStyle(.secondary)
             }
             .padding()
-            .background(Color.bgSecondary(scheme: colorScheme))
+            .background(ShortcutColors.bgSecondary(scheme: colorScheme))
         }
         .frame(width: 600, height: 500)
-        .background(Color.bgPrimary(scheme: colorScheme))
+        .background(ShortcutColors.bgPrimary(scheme: colorScheme))
     }
 }
 
@@ -311,11 +306,11 @@ private struct CategoryButton: View {
 
                 Spacer()
             }
-            .foregroundColor(isSelected ? .fgInverse(scheme: colorScheme) : Color.fgPrimary(scheme: colorScheme))
-            .padding(.horizontal, Spacing.sm.rawValue)
-            .padding(.vertical, Spacing.xs.rawValue)
-            .background(isSelected ? Color.accentPrimary : Color.clear)
-            .cornerRadius(CornerRadius.sm.rawValue)
+            .foregroundColor(isSelected ? ShortcutColors.fgInverse(scheme: colorScheme) : ShortcutColors.fgPrimary(scheme: colorScheme))
+            .padding(.horizontal, ShortcutStyles.Spacing.sm.rawValue)
+            .padding(.vertical, ShortcutStyles.Spacing.xs.rawValue)
+            .background(isSelected ? ShortcutColors.accentPrimary : Color.clear)
+            .cornerRadius(ShortcutStyles.CornerRadius.sm.rawValue)
         }
         .buttonStyle(.plain)
     }
@@ -335,11 +330,11 @@ private struct ShortcutRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(action.displayName)
                     .font(.callout)
-                    .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+                    .foregroundColor(ShortcutColors.fgPrimary(scheme: colorScheme))
 
                 Text(action.description)
                     .font(.caption)
-                    .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+                    .foregroundColor(ShortcutColors.fgSecondary(scheme: colorScheme))
             }
 
             Spacer()
@@ -349,11 +344,11 @@ private struct ShortcutRow: View {
                 ForEach(shortcutKeys, id: \.self) { key in
                     Text(key)
                         .font(.caption)
-                        .foregroundColor(Color.fgPrimary(scheme: colorScheme))
-                        .padding(.horizontal, Spacing.xs.rawValue)
+                        .foregroundColor(ShortcutColors.fgPrimary(scheme: colorScheme))
+                        .padding(.horizontal, ShortcutStyles.Spacing.xs.rawValue)
                         .padding(.vertical, 2)
-                        .background(Color.bgTertiary(scheme: colorScheme))
-                        .cornerRadius(CornerRadius.sm.rawValue)
+                        .background(ShortcutColors.bgTertiary(scheme: colorScheme))
+                        .cornerRadius(ShortcutStyles.CornerRadius.sm.rawValue)
                 }
             }
 
@@ -365,7 +360,7 @@ private struct ShortcutRow: View {
                 .buttonStyle(.icon(size: 20))
             }
         }
-        .padding(.vertical, Spacing.xs.rawValue)
+        .padding(.vertical, ShortcutStyles.Spacing.xs.rawValue)
         .onHover { isHovered = $0 }
     }
 

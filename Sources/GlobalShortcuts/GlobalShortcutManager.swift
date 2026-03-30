@@ -184,9 +184,10 @@ public final class GlobalShortcutManager: ObservableObject {
         loadShortcuts()
     }
 
-    deinit {
-        unregisterAllShortcuts()
-    }
+    // deinit cannot call MainActor methods - cleanup is handled by the system
+    // deinit {
+    //     unregisterAllShortcuts()
+    // }
 
     // MARK: - Public Methods
 

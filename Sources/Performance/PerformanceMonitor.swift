@@ -51,7 +51,7 @@ public struct PerformanceMetrics: Sendable {
 }
 
 /// Performance alert types
-public enum PerformanceAlert: Sendable {
+public enum PerformanceAlert: Sendable, Hashable {
     case highCPUUsage(percentage: Double)
     case highMemoryUsage(bytes: UInt64)
     case memoryPressure(PerformanceMetrics.MemoryPressure)
@@ -101,6 +101,10 @@ public final class PerformanceMonitor: ObservableObject {
     // Historical metrics storage
     private var metricsHistory: [PerformanceMetrics] = []
     private let maxHistoryCount = 100
+
+    // MARK: - Singleton
+
+    public static let shared = PerformanceMonitor()
 
     // MARK: - Initialization
 
@@ -313,14 +317,27 @@ public final class PerformanceMonitor: ObservableObject {
     }
 
     private nonisolated func getMemoryPressure() -> PerformanceMetrics.MemoryPressure {
-        // Use system memory pressure notification
-        let memoryStatus = os_proc_available_memory()
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let availableRatio = Double(memoryStatus) / Double(totalMemory)
+        // On macOS, use vm_statistics to estimate memory pressure
+        var vmStats = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
 
-        if availableRatio < 0.1 {
+        let result = withUnsafeMutablePointer(to: &vmStats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+
+        guard result == KERN_SUCCESS else {
+            return .normal
+        }
+
+        let used = Double(vmStats.active_count + vmStats.wire_count)
+        let total = Double(ProcessInfo.processInfo.physicalMemory / UInt64(vm_page_size))
+        let usedRatio = used / total
+
+        if usedRatio > 0.9 {
             return .critical
-        } else if availableRatio < 0.2 {
+        } else if usedRatio > 0.8 {
             return .warning
         } else {
             return .normal
@@ -458,7 +475,7 @@ public struct PerformanceMetricsView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
 
-                ForEach(monitor.alerts.suffix(5), id: \.hashValue) { alert in
+                ForEach(Array(monitor.alerts.suffix(5)), id: \.hashValue) { alert in
                     Text(alertDescription(alert))
                         .font(.caption)
                         .foregroundColor(.orange)

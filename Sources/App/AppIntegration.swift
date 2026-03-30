@@ -4,8 +4,16 @@
 // Public exports for App module and integration helpers
 
 import Foundation
+import MenuBar
+import GlobalShortcuts
+import Notifications
+import Spotlight
+import Project
+import State
+import Models
 
 // App Integration Module
+@MainActor
 public enum AppIntegration {
     /// Initialize all Phase 4 integrations
     public static func initialize() {

@@ -110,6 +110,10 @@ public final class LaunchOptimizer: ObservableObject {
     private var preloadedResources: [String: Any] = [:]
     private let preloadQueue = DispatchQueue(label: "com.claude.desktop.preload", qos: .userInitiated)
 
+    // MARK: - Singleton
+
+    public static let shared = LaunchOptimizer()
+
     // MARK: - Initialization
 
     public init() {}

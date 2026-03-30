@@ -5,11 +5,12 @@
 
 import Foundation
 import Combine
+import Protocol
 
 // MARK: - Streaming State
 
 /// State of a streaming response
-public enum StreamingState: Sendable {
+public enum StreamingState: Sendable, Equatable {
     case idle
     case streaming
     case completed
@@ -20,7 +21,7 @@ public enum StreamingState: Sendable {
 // MARK: - Streaming Error
 
 /// Errors during streaming
-public enum StreamingError: Error, Sendable, LocalizedError {
+public enum StreamingError: Error, Sendable, LocalizedError, Equatable {
     case timeout
     case connectionLost
     case parseError(String)

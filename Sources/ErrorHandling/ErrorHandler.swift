@@ -12,7 +12,7 @@ import Combine
 public enum ErrorCategory: String, Sendable, Codable {
     case cli         // CLI-related errors
     case connection  // Connection errors
-    case protocol    // Protocol/communication errors
+    case messaging   // Protocol/communication errors (renamed from 'protocol' which is a Swift keyword)
     case streaming   // Streaming errors
     case process     // Process management errors
     case system      // System errors
@@ -91,87 +91,26 @@ public final class ErrorHandler: @unchecked Sendable {
         let info = createErrorInfo(from: error, category: errorCategory)
 
         // Add to history
-        lock.lock()
-        errorHistory.append(info)
-        if errorHistory.count > maxErrorHistory {
-            errorHistory.removeFirst()
-        }
-        lock.unlock()
-
-        // Emit error
-        errorSubject.send(info)
-
-        // Emit recovery suggestion if recoverable
-        if info.recoverable {
-            recoverySubject.send(info)
-        }
-
-        return info
-    }
-
-    /// Handle a CLI detection error
-    @discardableResult
-    public func handle(_ error: CLIDetectionError) -> ErrorInfo {
-        let info = ErrorInfo(
-            category: .cli,
-            code: "CLI_\(error.code)",
-            message: error.errorDescription ?? "CLI detection error",
-            suggestedSolution: error.suggestedSolution,
-            recoverable: error.canRecover
-        )
         addError(info)
+
         return info
     }
 
-    /// Handle a process error
+    /// Handle an error with explicit category and code
     @discardableResult
-    public func handle(_ error: CLIProcessError) -> ErrorInfo {
+    public func handle(
+        _ error: Error,
+        category: ErrorCategory,
+        code: String,
+        suggestedSolution: String? = nil,
+        recoverable: Bool = true
+    ) -> ErrorInfo {
         let info = ErrorInfo(
-            category: .process,
-            code: "PROCESS_\(error.code)",
-            message: error.errorDescription ?? "Process error",
-            suggestedSolution: error.suggestedSolution,
-            recoverable: error.canRecover
-        )
-        addError(info)
-        return info
-    }
-
-    /// Handle a pipeline error
-    @discardableResult
-    public func handle(_ error: PipelineError) -> ErrorInfo {
-        let info = ErrorInfo(
-            category: .connection,
-            code: "PIPELINE_\(error.code)",
-            message: error.errorDescription ?? "Pipeline error",
-            recoverable: error.canRecover
-        )
-        addError(info)
-        return info
-    }
-
-    /// Handle a connection error
-    @discardableResult
-    public func handle(_ error: ConnectionError) -> ErrorInfo {
-        let info = ErrorInfo(
-            category: .connection,
-            code: "CONNECTION_\(error.code)",
-            message: error.errorDescription ?? "Connection error",
-            suggestedSolution: error.suggestedSolution,
-            recoverable: error.shouldRetry
-        )
-        addError(info)
-        return info
-    }
-
-    /// Handle a streaming error
-    @discardableResult
-    public func handle(_ error: StreamingError) -> ErrorInfo {
-        let info = ErrorInfo(
-            category: .streaming,
-            code: "STREAMING_\(error.code)",
-            message: error.errorDescription ?? "Streaming error",
-            recoverable: error.canRecover
+            category: category,
+            code: code,
+            message: error.localizedDescription,
+            suggestedSolution: suggestedSolution,
+            recoverable: recoverable
         )
         addError(info)
         return info
@@ -223,18 +162,18 @@ public final class ErrorHandler: @unchecked Sendable {
     }
 
     private func categorize(_ error: Error) -> ErrorCategory {
-        if error is CLIDetectionError {
+        let errorString = String(describing: type(of: error))
+
+        if errorString.contains("CLI") || errorString.contains("Detection") {
             return .cli
-        } else if error is CLIProcessError {
-            return .process
-        } else if error is PipelineError {
+        } else if errorString.contains("Connection") || errorString.contains("Pipeline") {
             return .connection
-        } else if error is ConnectionError {
-            return .connection
-        } else if error is StreamingError {
+        } else if errorString.contains("Stream") {
             return .streaming
-        } else if error is SerializationError {
-            return .protocol
+        } else if errorString.contains("Process") {
+            return .process
+        } else if errorString.contains("Serialization") || errorString.contains("Protocol") {
+            return .messaging
         }
         return .unknown
     }
@@ -250,116 +189,6 @@ public final class ErrorHandler: @unchecked Sendable {
             details: nsError.localizedFailureReason,
             recoverable: true
         )
-    }
-}
-
-// MARK: - Error Code Extensions
-
-extension CLIDetectionError {
-    var code: String {
-        switch self {
-        case .cliNotFound: return "NOT_FOUND"
-        case .pathNotAccessible: return "PATH_NOT_ACCESSIBLE"
-        case .versionCheckFailed: return "VERSION_CHECK_FAILED"
-        case .apiKeyNotConfigured: return "API_KEY_NOT_CONFIGURED"
-        case .detectionFailed: return "DETECTION_FAILED"
-        case .customPathInvalid: return "CUSTOM_PATH_INVALID"
-        }
-    }
-
-    var canRecover: Bool {
-        switch self {
-        case .cliNotFound, .customPathInvalid:
-            return true
-        case .apiKeyNotConfigured:
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-extension CLIProcessError {
-    var code: String {
-        switch self {
-        case .processAlreadyRunning: return "ALREADY_RUNNING"
-        case .processNotRunning: return "NOT_RUNNING"
-        case .failedToStart: return "FAILED_TO_START"
-        case .failedToTerminate: return "FAILED_TO_TERMINATE"
-        case .unexpectedTermination: return "UNEXPECTED_TERMINATION"
-        case .timeout: return "TIMEOUT"
-        case .zombieProcessDetected: return "ZOMBIE_PROCESS"
-        }
-    }
-
-    var canRecover: Bool {
-        switch self {
-        case .processAlreadyRunning, .processNotRunning:
-            return true
-        case .unexpectedTermination, .zombieProcessDetected:
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-extension PipelineError {
-    var code: String {
-        switch self {
-        case .notConnected: return "NOT_CONNECTED"
-        case .writeFailed: return "WRITE_FAILED"
-        case .readFailed: return "READ_FAILED"
-        case .connectionTimeout: return "TIMEOUT"
-        case .invalidData: return "INVALID_DATA"
-        case .pipelineClosed: return "PIPELINE_CLOSED"
-        }
-    }
-
-    var canRecover: Bool {
-        switch self {
-        case .notConnected, .connectionTimeout:
-            return true
-        default:
-            return false
-        }
-    }
-}
-
-extension ConnectionError {
-    var code: String {
-        switch self {
-        case .cliNotFound: return "CLI_NOT_FOUND"
-        case .cliNotRunning: return "CLI_NOT_RUNNING"
-        case .connectionFailed: return "CONNECTION_FAILED"
-        case .authenticationFailed: return "AUTH_FAILED"
-        case .timeout: return "TIMEOUT"
-        case .networkError: return "NETWORK_ERROR"
-        case .protocolError: return "PROTOCOL_ERROR"
-        case .unexpectedDisconnect: return "UNEXPECTED_DISCONNECT"
-        case .maxRetriesExceeded: return "MAX_RETRIES_EXCEEDED"
-        }
-    }
-}
-
-extension StreamingError {
-    var code: String {
-        switch self {
-        case .timeout: return "TIMEOUT"
-        case .connectionLost: return "CONNECTION_LOST"
-        case .parseError: return "PARSE_ERROR"
-        case .interrupted: return "INTERRUPTED"
-        case .invalidState: return "INVALID_STATE"
-        }
-    }
-
-    var canRecover: Bool {
-        switch self {
-        case .connectionLost, .timeout:
-            return true
-        default:
-            return false
-        }
     }
 }
 

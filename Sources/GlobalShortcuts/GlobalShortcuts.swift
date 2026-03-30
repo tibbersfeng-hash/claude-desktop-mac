@@ -6,6 +6,7 @@
 import Foundation
 
 // GlobalShortcuts Module
+@MainActor
 public enum GlobalShortcuts {
     /// Initialize global shortcuts
     public static func initialize() {

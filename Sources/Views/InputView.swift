@@ -4,6 +4,9 @@
 // Message input area with send functionality
 
 import SwiftUI
+import Theme
+import Models
+import State
 
 // MARK: - Input View
 
@@ -11,7 +14,7 @@ public struct InputView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.highContrast) private var highContrast
 
-    @Bindable var inputState: MessageInputState
+    @ObservedObject var inputState: MessageInputState
     let connectionState: ConnectionState
     let isStreaming: Bool
     let projectPath: String?
@@ -86,7 +89,6 @@ public struct InputView: View {
                     .disabled(!inputState.canSend || connectionState != .connected)
                     .accessibilityLabel("Send message")
                     .accessibilityHint("Double tap to send your message")
-                    .accessibilityAddTraits(inputState.canSend ? [] : .notEnabled)
                     .help("Send (Cmd+Enter)")
                 }
             }
@@ -295,24 +297,26 @@ struct ConnectionPromptView: View {
 
 // MARK: - Preview
 
-#Preview {
-    VStack {
-        Spacer()
+struct InputView_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack {
+            Spacer()
 
-        InputView(
-            inputState: {
-                let state = MessageInputState()
-                state.text = "Hello, Claude!"
-                return state
-            }(),
-            connectionState: .connected,
-            isStreaming: false,
-            projectPath: "/Users/dev/project",
-            model: "claude-sonnet-4.6",
-            onSend: {},
-            onInterrupt: {}
-        )
+            InputView(
+                inputState: {
+                    let state = MessageInputState()
+                    state.text = "Hello, Claude!"
+                    return state
+                }(),
+                connectionState: .connected,
+                isStreaming: false,
+                projectPath: "/Users/dev/project",
+                model: "claude-sonnet-4.6",
+                onSend: {},
+                onInterrupt: {}
+            )
+        }
+        .frame(width: 600, height: 300)
+        .background(Color.bgPrimaryDark)
     }
-    .frame(width: 600, height: 300)
-    .background(Color.bgPrimaryDark)
 }

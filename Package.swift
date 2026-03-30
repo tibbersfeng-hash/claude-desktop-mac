@@ -137,7 +137,7 @@ let package = Package(
                 "State",
                 "ErrorHandling"
             ],
-            path: "Sources"),
+            path: "Sources/CLIConnector"),
 
         // Phase 2: UI Layer
         .target(
@@ -155,7 +155,8 @@ let package = Package(
                 "Protocol",
                 "Streaming",
                 "State",
-                "CLIConnector"
+                "CLIConnector",
+                "ErrorHandling"
             ],
             path: "Sources/ViewModels"),
         .target(
@@ -163,7 +164,8 @@ let package = Package(
             dependencies: [
                 "Theme",
                 "Models",
-                "ViewModels"
+                "ViewModels",
+                "State"
             ],
             path: "Sources/Views"),
         .target(
@@ -200,7 +202,7 @@ let package = Package(
             path: "Sources/Upload"),
         .target(
             name: "Shortcuts",
-            dependencies: ["Theme"],
+            dependencies: [],
             path: "Sources/Shortcuts"),
         .target(
             name: "History",
@@ -218,7 +220,7 @@ let package = Package(
             path: "Sources/MenuBar"),
         .target(
             name: "GlobalShortcuts",
-            dependencies: ["Theme", "Models", "Shortcuts", "MenuBar"],
+            dependencies: ["Theme", "Models", "Shortcuts", "MenuBar", "Project"],
             path: "Sources/GlobalShortcuts"),
         .target(
             name: "Spotlight",
@@ -250,14 +252,6 @@ let package = Package(
             path: "Sources/Performance"),
 
         // Test Targets
-        .testTarget(
-            name: "CLIDetectorTests",
-            dependencies: ["CLIDetector"],
-            path: "Tests/CLIDetectorTests"),
-        .testTarget(
-            name: "CLIManagerTests",
-            dependencies: ["CLIManager"],
-            path: "Tests/CLIManagerTests"),
         .testTarget(
             name: "ProtocolTests",
             dependencies: ["Protocol"],

@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import AppKit
 
 /// Memory management configuration
 public struct MemoryConfig: Sendable {
@@ -177,16 +178,10 @@ public final class MemoryManager: ObservableObject {
     // MARK: - Private Methods
 
     private func setupMemoryWarningHandling() {
-        // Listen for system memory warnings
-        NotificationCenter.default
-            .publisher(for: NSApplication.didReceiveMemoryWarningNotification)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.handleMemoryWarning()
-            }
-            .store(in: &cancellables)
+        // Note: macOS doesn't have NSApplication.didReceiveMemoryWarningNotification like iOS
+        // Instead, we rely on our periodic memory pressure checks
 
-        // Monitor memory pressure
+        // Monitor memory pressure periodically
         Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.checkMemoryPressure()
@@ -205,9 +200,25 @@ public final class MemoryManager: ObservableObject {
     }
 
     private func checkMemoryPressure() {
-        let availableMemory = os_proc_available_memory()
-        let totalMemory = ProcessInfo.processInfo.physicalMemory
-        let usageRatio = 1.0 - Double(availableMemory) / Double(totalMemory)
+        // On macOS, use vm_statistics to estimate memory pressure
+        var vmStats = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.size / MemoryLayout<integer_t>.size)
+
+        let result = withUnsafeMutablePointer(to: &vmStats) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(mach_host_self(), HOST_VM_INFO64, $0, &count)
+            }
+        }
+
+        guard result == KERN_SUCCESS else {
+            warningLevel = .normal
+            isUnderMemoryPressure = false
+            return
+        }
+
+        let used = Double(vmStats.active_count + vmStats.wire_count)
+        let total = Double(ProcessInfo.processInfo.physicalMemory / UInt64(vm_page_size))
+        let usageRatio = used / total
 
         isUnderMemoryPressure = usageRatio > config.warningThreshold
 
@@ -309,7 +320,7 @@ public final class MemoryManager: ObservableObject {
 private struct SessionMemoryInfo: Sendable {
     let id: String
     let memoryUsage: UInt64
-    let lastAccessed: Date
+    var lastAccessed: Date
 }
 
 /// Memory report
@@ -457,13 +468,8 @@ public final class ImageCache: CacheProtocol, @unchecked Sendable {
         cache.totalCostLimit = maxMemoryMB * 1024 * 1024
         cache.countLimit = maxCount
 
-        // Respond to memory warnings
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(clearCache),
-            name: NSApplication.didReceiveMemoryWarningNotification,
-            object: nil
-        )
+        // Note: macOS doesn't have NSApplication.didReceiveMemoryWarningNotification like iOS
+        // We rely on the NSCache's automatic eviction behavior
     }
 
     public func get(_ key: String) -> Any? {

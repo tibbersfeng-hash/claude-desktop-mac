@@ -5,52 +5,6 @@
 
 import SwiftUI
 
-// MARK: - Tool Status Accessibility
-
-extension ToolCallDisplayStatus {
-    /// Accessibility description for VoiceOver
-    public var accessibilityDescription: String {
-        switch self {
-        case .pending:
-            return "pending"
-        case .running:
-            return "currently running"
-        case .success:
-            return "completed successfully"
-        case .error:
-            return "failed with error"
-        }
-    }
-}
-
-// MARK: - Diff Line Type Accessibility
-
-extension DiffLineType {
-    /// Accessibility description for VoiceOver
-    public var accessibilityDescription: String {
-        switch self {
-        case .addition:
-            return "Added line"
-        case .deletion:
-            return "Deleted line"
-        case .context:
-            return "Context line"
-        }
-    }
-
-    /// Accessibility hint for VoiceOver
-    public var accessibilityHint: String {
-        switch self {
-        case .addition:
-            return "This line was added"
-        case .deletion:
-            return "This line was removed"
-        case .context:
-            return "Unchanged line"
-        }
-    }
-}
-
 // MARK: - Accessibility Trait Helpers
 
 extension View {
@@ -112,8 +66,12 @@ extension EnvironmentValues {
 
 /// Animation modifier that respects reduce motion preference
 public struct AccessibleAnimationModifier: ViewModifier {
-    let animation: Animation?
+    public let animation: Animation?
     @Environment(\.reduceMotion) var reduceMotion
+
+    public init(animation: Animation?) {
+        self.animation = animation
+    }
 
     public func body(content: Content) -> some View {
         if reduceMotion {
@@ -150,28 +108,30 @@ public func withAccessibleAnimation<Result>(
 extension AnyTransition {
     /// Fade-only transition for reduce motion users
     public static var accessibleFade: AnyTransition {
-        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            return .opacity
-        } else {
-            return .opacity.combined(with: .scale(scale: 0.95))
+        get {
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                return AnyTransition.opacity
+            } else {
+                return AnyTransition.opacity.combined(with: AnyTransition.scale(scale: 0.95))
+            }
         }
     }
 
     /// Accessible slide transition
     public static func accessibleSlide(edge: Edge) -> AnyTransition {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            return .opacity
+            return AnyTransition.opacity
         } else {
-            return .slide(edge: edge).combined(with: .opacity)
+            return AnyTransition.move(edge: edge).combined(with: AnyTransition.opacity)
         }
     }
 
     /// Accessible move transition
     public static func accessibleMove(edge: Edge) -> AnyTransition {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            return .opacity
+            return AnyTransition.opacity
         } else {
-            return .move(edge: edge)
+            return AnyTransition.move(edge: edge)
         }
     }
 }
@@ -181,6 +141,8 @@ extension AnyTransition {
 /// Button style with accessibility enhancements
 public struct AccessibleButtonStyle: ButtonStyle {
     @Environment(\.reduceMotion) var reduceMotion
+
+    public init() {}
 
     public func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -198,9 +160,9 @@ extension ButtonStyle where Self == AccessibleButtonStyle {
 #if DEBUG
 /// Preview wrapper that simulates accessibility settings
 public struct AccessibilityPreview<Content: View>: View {
-    let reduceMotion: Bool
-    let highContrast: Bool
-    let content: Content
+    public let reduceMotion: Bool
+    public let highContrast: Bool
+    public let content: Content
 
     public init(
         reduceMotion: Bool = false,

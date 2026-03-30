@@ -5,6 +5,9 @@
 
 import SwiftUI
 import AppKit
+import Theme
+import Models
+import Project
 
 // MARK: - Command Palette Item
 
@@ -358,7 +361,8 @@ public struct CommandPaletteView: View {
             // Results
             resultsView
         }
-        .frame(width: 500, maxHeight: 400)
+        .frame(width: 500)
+        .frame(maxHeight: 400)
         .background(Color.bgPrimary(scheme: colorScheme))
         .cornerRadius(CornerRadius.lg.rawValue)
         .shadow(AppShadow.lg)
@@ -508,7 +512,7 @@ public struct CommandPaletteView: View {
                     }
                     if let time = session.lastMessageTime {
                         Text("-")
-                        Text(time.relativeTime)
+                        Text(time, style: .relative)
                             .foregroundColor(Color.fgTertiary(scheme: colorScheme))
                     }
                 }

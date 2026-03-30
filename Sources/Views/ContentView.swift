@@ -4,9 +4,14 @@
 // Root view that orchestrates the main UI layout
 
 import SwiftUI
+import Theme
+import Models
+import ViewModels
+import State
 
 // MARK: - Content View
 
+@MainActor
 public struct ContentView: View {
     @Environment(\.colorScheme) private var colorScheme
 
@@ -19,8 +24,8 @@ public struct ContentView: View {
     @State private var windowWidth: CGFloat = WindowDimensions.defaultWidth
 
     public init(
-        sessionViewModel: SessionListViewModel = SessionListViewModel(),
-        chatViewModel: ChatViewModel = ChatViewModel()
+        sessionViewModel: SessionListViewModel,
+        chatViewModel: ChatViewModel
     ) {
         self._sessionViewModel = State(initialValue: sessionViewModel)
         self._chatViewModel = State(initialValue: chatViewModel)
@@ -99,50 +104,6 @@ public struct ContentView: View {
                         .foregroundColor(Color.fgSecondary(scheme: colorScheme))
                 }
                 .help("Settings (Cmd+,)")
-            }
-        }
-        .commands {
-            // File menu commands
-            CommandGroup(replacing: .newItem) {
-                Button("New Session") {
-                    sessionViewModel.createSession()
-                }
-                .keyboardShortcut("n", modifiers: .command)
-
-                Button("New Session with Project...") {
-                    // Show project picker
-                }
-            }
-
-            // Edit menu commands
-            CommandGroup(after: .pasteboard) {
-                Divider()
-
-                Button("Clear Conversation") {
-                    // Clear current conversation
-                }
-                .keyboardShortcut("k", modifiers: [.command, .shift])
-            }
-
-            // View menu commands
-            CommandGroup(after: .sidebar) {
-                Button("Toggle Sidebar") {
-                    toggleSidebar()
-                }
-                .keyboardShortcut("/", modifiers: .command)
-            }
-
-            // Window menu commands
-            CommandGroup(after: .windowArrangement) {
-                Button("Previous Session") {
-                    sessionViewModel.selectPreviousSession()
-                }
-                .keyboardShortcut("[", modifiers: [.command, .shift])
-
-                Button("Next Session") {
-                    sessionViewModel.selectNextSession()
-                }
-                .keyboardShortcut("]", modifiers: [.command, .shift])
             }
         }
         .onAppear {
@@ -276,13 +237,16 @@ struct SettingsView: View {
 
 // MARK: - Preview
 
-#Preview {
-    ContentView(
-        sessionViewModel: {
-            let vm = SessionListViewModel()
-            vm.sessions = Session.samples
-            return vm
-        }()
-    )
-    .frame(width: WindowDimensions.defaultWidth, height: WindowDimensions.defaultHeight)
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView(
+            sessionViewModel: {
+                let vm = SessionListViewModel()
+                vm.sessions = Session.samples
+                return vm
+            }(),
+            chatViewModel: ChatViewModel()
+        )
+        .frame(width: WindowDimensions.defaultWidth, height: WindowDimensions.defaultHeight)
+    }
 }

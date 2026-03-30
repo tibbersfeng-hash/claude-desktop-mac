@@ -5,11 +5,20 @@
 
 import SwiftUI
 import AppKit
+import CoreSpotlight
+import MenuBar
+import GlobalShortcuts
+import Notifications
+import Spotlight
+import Project
+import State
+import Models
 
 // MARK: - App Delegate
 
 /// Main application delegate
 @main
+@MainActor
 public class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Properties

@@ -4,6 +4,9 @@
 // Displays file differences with syntax highlighting
 
 import SwiftUI
+import Theme
+import Models
+import ViewModels
 
 // MARK: - Diff View
 
@@ -440,9 +443,11 @@ public struct DiffPreviewView: View {
 
 // MARK: - Preview
 
-#Preview {
-    DiffView(fileDiff: .sample)
-        .frame(width: 700, height: 500)
-        .padding()
-        .background(Color.bgPrimaryDark)
+struct DiffView_Previews: PreviewProvider {
+    static var previews: some View {
+        DiffView(fileDiff: .sample)
+            .frame(width: 700, height: 500)
+            .padding()
+            .background(Color.bgPrimaryDark)
+    }
 }

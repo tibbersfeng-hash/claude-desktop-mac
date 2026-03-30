@@ -5,6 +5,8 @@
 
 import SwiftUI
 import Combine
+import Models
+import Theme
 
 // MARK: - History Manager
 

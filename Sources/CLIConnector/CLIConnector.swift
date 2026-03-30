@@ -5,6 +5,13 @@
 
 import Foundation
 import Combine
+import CLIDetector
+import CLIManager
+import Communication
+import Streaming
+import Protocol
+import State
+import ErrorHandling
 
 // MARK: - CLI Connector
 
@@ -149,11 +156,13 @@ public final class CLIConnector: ObservableObject, @unchecked Sendable {
         // Bind response updates
         connectionManager.responsePublisher
             .receive(on: DispatchQueue.main)
+            .map { Optional($0) }
             .assign(to: &$currentResponse)
 
         // Bind errors
         errorHandler.errorPublisher
             .receive(on: DispatchQueue.main)
+            .map { Optional($0) }
             .assign(to: &$lastError)
     }
 }

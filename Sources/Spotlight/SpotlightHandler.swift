@@ -6,6 +6,8 @@
 import Foundation
 import CoreSpotlight
 import AppKit
+import Models
+import Project
 
 // MARK: - Spotlight Handler
 
@@ -107,46 +109,16 @@ public struct SpotlightSearchResult: Identifiable {
 public final class SpotlightQuery {
 
     /// Search for sessions and projects
+    /// Note: Core Spotlight doesn't support direct query API on macOS.
+    /// This is a placeholder for future implementation or custom search.
     public static func search(query: String) async -> [SpotlightSearchResult] {
         guard !query.isEmpty else { return [] }
 
-        var results: [SpotlightSearchResult] = []
+        // Core Spotlight doesn't have a direct query API for searching
+        // Search results come through NSUserActivity when user selects from Spotlight
+        // This method can be implemented with a local index if needed
 
-        // Create search query
-        let searchQuery = CSSearchableQuery(
-            queryString: query,
-            completionBlock: { queryResults, error in
-                if let error = error {
-                    print("Spotlight query error: \(error)")
-                    return
-                }
-
-                guard let queryResults = queryResults else { return }
-
-                for item in queryResults {
-                    let result = SpotlightSearchResult(
-                        id: item.uniqueIdentifier,
-                        title: item.attributeSet.title ?? "Untitled",
-                        subtitle: item.attributeSet.contentDescription ?? "",
-                        contentDescription: item.attributeSet.contentDescription ?? "",
-                        type: item.domainIdentifier.contains("session") ? .session : .project,
-                        identifier: item.uniqueIdentifier
-                    )
-                    results.append(result)
-                }
-            }
-        )
-
-        // Execute query
-        searchQuery.start()
-
-        // Wait for completion
-        // Note: In real implementation, this should use async/await properly
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-
-        searchQuery.stop()
-
-        return results
+        return []
     }
 }
 

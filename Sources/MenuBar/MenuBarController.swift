@@ -6,6 +6,8 @@
 import SwiftUI
 import AppKit
 import Combine
+import Models
+import Project
 
 // MARK: - MenuBar Controller
 

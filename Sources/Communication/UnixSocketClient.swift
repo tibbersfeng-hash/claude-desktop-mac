@@ -107,9 +107,10 @@ public final class UnixSocketClient: @unchecked Sendable {
 
         // Copy path to sun_path
         let pathData = socketPath.data(using: .utf8)!
+        let maxPathLength = MemoryLayout.size(ofValue: addr.sun_path) - 1
         pathData.withUnsafeBytes { ptr in
             if let baseAddr = ptr.baseAddress {
-                memcpy(&addr.sun_path, baseAddr, min(pathData.count, Int(UNIX_PATH_MAX) - 1))
+                memcpy(&addr.sun_path, baseAddr, min(pathData.count, maxPathLength))
             }
         }
 

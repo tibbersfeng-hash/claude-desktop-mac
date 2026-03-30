@@ -156,7 +156,7 @@ public final class CLIProcessManager: @unchecked Sendable {
 
     deinit {
         stopMonitoring()
-        terminateProcess(force: true)
+        terminateProcessInternal(force: true)
     }
 
     // MARK: - Public Methods

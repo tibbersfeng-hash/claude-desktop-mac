@@ -77,6 +77,11 @@ public enum AnimationDuration: Double {
 // MARK: - View Extensions for Styles
 
 extension View {
+    /// Apply custom shadow from AppShadow
+    public func shadow(_ shadow: AppShadow) -> some View {
+        self.shadow(color: shadow.color, radius: shadow.radius, x: shadow.x, y: shadow.y)
+    }
+
     /// Apply card style
     public func cardStyle(scheme: ColorScheme) -> some View {
         self
@@ -254,10 +259,14 @@ extension ButtonStyle where Self == IconButtonStyle {
 
 // MARK: - View Modifiers
 
-struct PaddingModifier: ViewModifier {
+public struct PaddingModifier: ViewModifier {
     let padding: Spacing
 
-    func body(content: Content) -> some View {
+    public init(padding: Spacing) {
+        self.padding = padding
+    }
+
+    public func body(content: Content) -> some View {
         content.padding(padding.rawValue)
     }
 }
@@ -302,7 +311,7 @@ extension Animation {
     /// Normal app animation that respects reduce motion
     public static var appNormalAccessible: Animation {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            return .none
+            return .linear(duration: 0)
         }
         return .appNormal
     }
@@ -310,7 +319,7 @@ extension Animation {
     /// Fast app animation that respects reduce motion
     public static var appFastAccessible: Animation {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            return .none
+            return .linear(duration: 0)
         }
         return .appFast
     }
@@ -318,7 +327,7 @@ extension Animation {
     /// Slow app animation that respects reduce motion
     public static var appSlowAccessible: Animation {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            return .none
+            return .linear(duration: 0)
         }
         return .appSlow
     }
@@ -326,7 +335,7 @@ extension Animation {
     /// Creates an animation that respects reduce motion preference
     public static func accessible(_ animation: Animation) -> Animation {
         if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
-            return .none
+            return .linear(duration: 0)
         }
         return animation
     }

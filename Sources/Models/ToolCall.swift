@@ -5,6 +5,7 @@
 
 import Foundation
 import SwiftUI
+import Protocol
 
 // MARK: - Tool Call Display
 
@@ -43,7 +44,7 @@ public struct ToolCallDisplay: Identifiable, Codable, Sendable, Hashable {
     public init(from toolCall: ToolCall, isExpanded: Bool = false) {
         self.id = toolCall.id
         self.name = toolCall.name
-        self.arguments = toolCall.arguments.map { Self.formatArguments($0) }
+        self.arguments = toolCall.arguments.flatMap { Self.formatArguments($0) }
         self.result = nil
         self.error = nil
         self.status = Self.mapStatus(toolCall.status)
@@ -159,9 +160,9 @@ public enum ToolCallDisplayStatus: String, Codable, Sendable {
     public var color: Color {
         switch self {
         case .pending: return .secondary
-        case .running: return .accentWarning
-        case .success: return .accentSuccess
-        case .error: return .accentError
+        case .running: return Color(hex: "FFD60A") // accentWarning
+        case .success: return Color(hex: "30D158") // accentSuccess
+        case .error: return Color(hex: "FF453A")   // accentError
         }
     }
 
@@ -171,6 +172,15 @@ public enum ToolCallDisplayStatus: String, Codable, Sendable {
         case .running: return "arrow.trianglehead.clockwise"
         case .success: return "checkmark.circle.fill"
         case .error: return "xmark.circle.fill"
+        }
+    }
+
+    public var accessibilityDescription: String {
+        switch self {
+        case .pending: return "pending"
+        case .running: return "running"
+        case .success: return "completed successfully"
+        case .error: return "failed with error"
         }
     }
 }
@@ -262,6 +272,24 @@ public enum DiffLineType: String, Codable, Sendable {
     case context    // Unchanged
     case addition   // Added
     case deletion   // Removed
+
+    /// Accessibility description for the line type
+    public var accessibilityDescription: String {
+        switch self {
+        case .context: return "Context line"
+        case .addition: return "Added line"
+        case .deletion: return "Removed line"
+        }
+    }
+
+    /// Accessibility hint for the line type
+    public var accessibilityHint: String {
+        switch self {
+        case .context: return "This line was not modified"
+        case .addition: return "This line was added"
+        case .deletion: return "This line was removed"
+        }
+    }
 }
 
 // MARK: - Sample Data
@@ -336,6 +364,35 @@ extension FileDiff {
                     ]
                 )
             ]
+        )
+    }
+}
+
+// MARK: - Color Hex Extension (local)
+
+private extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
         )
     }
 }

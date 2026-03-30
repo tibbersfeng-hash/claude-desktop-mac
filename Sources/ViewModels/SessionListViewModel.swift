@@ -6,6 +6,7 @@
 import Foundation
 import SwiftUI
 import Combine
+import Models
 
 // MARK: - Session List ViewModel
 

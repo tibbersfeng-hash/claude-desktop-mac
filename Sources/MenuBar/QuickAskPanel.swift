@@ -6,6 +6,7 @@
 import SwiftUI
 import AppKit
 import Combine
+import Theme
 
 // MARK: - Quick Ask Panel
 
@@ -69,10 +70,16 @@ public final class QuickAskPanel: NSPanel {
 
     /// Show the panel near the MenuBar icon
     public func showNearMenuBar() {
-        guard let screen = NSScreen.main,
-              let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength),
-              let button = statusItem.button else {
+        guard let screen = NSScreen.main else {
             // Fallback: center on screen
+            center()
+            makeKeyAndOrderFront(nil)
+            return
+        }
+
+        // Create a temporary status item to get position
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        guard let button = statusItem.button else {
             center()
             makeKeyAndOrderFront(nil)
             return
@@ -261,27 +268,29 @@ public struct QuickAskView: View {
     }
 
     private func responsePreview(_ summary: String) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.xs.rawValue) {
-            Text("Previous Response:")
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: Spacing.xs.rawValue) {
+                Text("Previous Response:")
+                    .font(.system(size: 11))
+                    .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+
+                Text(summary)
+                    .font(.system(size: 13))
+                    .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+                    .lineLimit(4)
+
+                Button("View Full Response") {
+                    viewModel.expandToMainWindow()
+                }
                 .font(.system(size: 11))
-                .foregroundColor(Color.fgSecondary(scheme: colorScheme))
-
-            Text(summary)
-                .font(.system(size: 13))
-                .foregroundColor(Color.fgPrimary(scheme: colorScheme))
-                .lineLimit(4)
-
-            Button("View Full Response") {
-                viewModel.expandToMainWindow()
+                .foregroundColor(.accentPrimary)
             }
-            .font(.system(size: 11))
-            .foregroundColor(.accentPrimary)
-        }
-        .padding(Spacing.md.rawValue)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.bgTertiary(scheme: colorScheme))
+            .padding(Spacing.md.rawValue)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.bgTertiary(scheme: colorScheme))
 
-        Divider()
+            Divider()
+        }
     }
 
     private var inputArea: some View {

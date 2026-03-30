@@ -4,7 +4,6 @@
 // Defines all keyboard shortcuts for the application
 
 import SwiftUI
-import KeyboardShortcuts
 
 // MARK: - Shortcut Action
 
@@ -97,60 +96,61 @@ public enum ShortcutAction: String, Codable, CaseIterable, Identifiable, Sendabl
         case .zoomOut: return "Zoom Out"
         case .resetZoom: return "Reset Zoom"
         }
+    }
 
-        /// Category for the shortcut
-        public var category: ShortcutCategory {
-            switch self {
-            case .newSession, .closeSession, .nextSession, .previousSession, .renameSession:
-                return .session
-            case .toggleSidebar, .focusInput, .scrollToTop, .scrollToBottom:
-                return .navigation
-            case .quickProjectSwitch, .openClaudeMd:
-                return .project
-            case .searchHistory, .searchInConversation:
-                return .search
-            case .sendMessage, .insertCodeBlock, .attachImage, .attachFile, .editLastMessage, .regenerate:
-                return .message
-            case .toggleToolCalls, .expandAllToolCalls, .collapseAllToolCalls:
-                return .view
-            case .settings, .keyboardShortcuts, .zoomIn, .zoomOut, .resetZoom:
-                return .general
-            }
-        }
-
-        /// Description of what the shortcut does
-        public var description: String {
-            switch self {
-            case .newSession: return "Create a new chat session"
-            case .closeSession: return "Close the current session"
-            case .nextSession: return "Switch to the next session"
-            case .previousSession: return "Switch to the previous session"
-            case .renameSession: return "Rename the current session"
-            case .toggleSidebar: return "Show or hide the sidebar"
-            case .focusInput: return "Focus the message input field"
-            case .scrollToTop: return "Scroll to the beginning of the conversation"
-            case .scrollToBottom: return "Scroll to the end of the conversation"
-            case .quickProjectSwitch: return "Open the project switcher"
-            case .openClaudeMd: return "Open the CLAUDE.md editor"
-            case .searchHistory: return "Search through conversation history"
-            case .searchInConversation: return "Search within the current conversation"
-            case .sendMessage: return "Send the current message"
-            case .insertCodeBlock: return "Insert a code block template"
-            case .attachImage: return "Open the image picker"
-            case .attachFile: return "Open the file picker"
-            case .editLastMessage: return "Edit your last message"
-            case .regenerate: return "Regenerate the last response"
-            case .toggleToolCalls: return "Toggle tool call visibility"
-            case .expandAllToolCalls: return "Expand all tool call details"
-            case .collapseAllToolCalls: return "Collapse all tool call details"
-            case .settings: return "Open the settings window"
-            case .keyboardShortcuts: return "Show keyboard shortcuts"
-            case .zoomIn: return "Increase text size"
-            case .zoomOut: return "Decrease text size"
-            case .resetZoom: return "Reset to default text size"
-            }
+    /// Category for the shortcut
+    public var category: ShortcutCategory {
+        switch self {
+        case .newSession, .closeSession, .nextSession, .previousSession, .renameSession:
+            return .session
+        case .toggleSidebar, .focusInput, .scrollToTop, .scrollToBottom:
+            return .navigation
+        case .quickProjectSwitch, .openClaudeMd:
+            return .project
+        case .searchHistory, .searchInConversation:
+            return .search
+        case .sendMessage, .insertCodeBlock, .attachImage, .attachFile, .editLastMessage, .regenerate:
+            return .message
+        case .toggleToolCalls, .expandAllToolCalls, .collapseAllToolCalls:
+            return .view
+        case .settings, .keyboardShortcuts, .zoomIn, .zoomOut, .resetZoom:
+            return .general
         }
     }
+
+    /// Description of what the shortcut does
+    public var description: String {
+        switch self {
+        case .newSession: return "Create a new chat session"
+        case .closeSession: return "Close the current session"
+        case .nextSession: return "Switch to the next session"
+        case .previousSession: return "Switch to the previous session"
+        case .renameSession: return "Rename the current session"
+        case .toggleSidebar: return "Show or hide the sidebar"
+        case .focusInput: return "Focus the message input field"
+        case .scrollToTop: return "Scroll to the beginning of the conversation"
+        case .scrollToBottom: return "Scroll to the end of the conversation"
+        case .quickProjectSwitch: return "Open the project switcher"
+        case .openClaudeMd: return "Open the CLAUDE.md editor"
+        case .searchHistory: return "Search through conversation history"
+        case .searchInConversation: return "Search within the current conversation"
+        case .sendMessage: return "Send the current message"
+        case .insertCodeBlock: return "Insert a code block template"
+        case .attachImage: return "Open the image picker"
+        case .attachFile: return "Open the file picker"
+        case .editLastMessage: return "Edit your last message"
+        case .regenerate: return "Regenerate the last response"
+        case .toggleToolCalls: return "Toggle tool call visibility"
+        case .expandAllToolCalls: return "Expand all tool call details"
+        case .collapseAllToolCalls: return "Collapse all tool call details"
+        case .settings: return "Open the settings window"
+        case .keyboardShortcuts: return "Show keyboard shortcuts"
+        case .zoomIn: return "Increase text size"
+        case .zoomOut: return "Decrease text size"
+        case .resetZoom: return "Reset to default text size"
+        }
+    }
+}
 
 // MARK: - Shortcut Category
 

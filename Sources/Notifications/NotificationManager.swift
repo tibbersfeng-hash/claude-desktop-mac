@@ -362,7 +362,7 @@ public final class NotificationManager: NSObject, ObservableObject {
 
 // MARK: - UNUserNotificationCenterDelegate
 
-extension NotificationManager: UNUserNotificationCenterDelegate {
+extension NotificationManager: @MainActor UNUserNotificationCenterDelegate {
 
     public func userNotificationCenter(
         _ center: UNUserNotificationCenter,

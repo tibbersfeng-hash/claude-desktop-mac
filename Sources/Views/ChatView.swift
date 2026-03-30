@@ -4,6 +4,9 @@
 // Main chat interface with message list and input
 
 import SwiftUI
+import Theme
+import Models
+import ViewModels
 
 // MARK: - Chat View
 
@@ -269,13 +272,14 @@ struct StreamingMessageView: View {
 // MARK: - Typing Indicator
 
 struct TypingIndicator: View {
+    @Environment(\.colorScheme) private var colorScheme
     @State private var animationPhase = 0
 
     var body: some View {
         HStack(spacing: 4) {
             ForEach(0..<3) { index in
                 Circle()
-                    .fill(Color.fgSecondary)
+                    .fill(Color.fgSecondary(scheme: colorScheme))
                     .frame(width: 6, height: 6)
                     .scaleEffect(animationPhase == index ? 1.2 : 0.8)
                     .opacity(animationPhase == index ? 1.0 : 0.5)
@@ -291,10 +295,12 @@ struct TypingIndicator: View {
 
 // MARK: - Preview
 
-#Preview {
-    ChatView(
-        session: Session.sample,
-        viewModel: ChatViewModel()
-    )
-    .frame(width: 800, height: 600)
+struct ChatView_Previews: PreviewProvider {
+    static var previews: some View {
+        ChatView(
+            session: Session.sample,
+            viewModel: ChatViewModel()
+        )
+        .frame(width: 800, height: 600)
+    }
 }

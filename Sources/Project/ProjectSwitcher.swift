@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import Theme
 
 // MARK: - Project Picker View
 
@@ -26,87 +27,108 @@ public struct ProjectPickerView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            // Search field
-            HStack(spacing: Spacing.sm.rawValue) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(Color.fgTertiary(scheme: colorScheme))
-
-                TextField("Search projects...", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .font(.bodyText)
-            }
-            .padding(Spacing.sm.rawValue)
-            .background(Color.bgSecondary(scheme: colorScheme))
-
+            searchField
             Divider()
-
-            // Project list
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    // Favorites section
-                    if !favoriteProjects.isEmpty {
-                        Section("Favorites") {
-                            ForEach(favoriteProjects) { project in
-                                ProjectItemView(
-                                    project: project,
-                                    isSelected: projectManager.currentProject?.id == project.id,
-                                    onSelect: { selectProject(project) },
-                                    onToggleFavorite: { projectManager.toggleFavorite(project.id) }
-                                )
-                            }
-                        }
-                    }
-
-                    // All projects section
-                    if !otherProjects.isEmpty {
-                        Section(favoriteProjects.isEmpty ? "" : "All Projects") {
-                            ForEach(otherProjects) { project in
-                                ProjectItemView(
-                                    project: project,
-                                    isSelected: projectManager.currentProject?.id == project.id,
-                                    onSelect: { selectProject(project) },
-                                    onToggleFavorite: { projectManager.toggleFavorite(project.id) }
-                                )
-                            }
-                        }
-                    }
-
-                    // Empty state
-                    if projectManager.projects.isEmpty {
-                        emptyStateView
-                    }
-                }
-                .padding(Spacing.sm.rawValue)
-            }
-
+            projectList
             Divider()
-
-            // Footer actions
-            HStack {
-                Button(action: { showAddProject = true }) {
-                    Label("Add Project", systemImage: "plus")
-                }
-                .buttonStyle(.secondary)
-
-                Spacer()
-
-                if !projectManager.projects.isEmpty {
-                    Button("Manage...") {
-                        // Open project management
-                    }
-                    .buttonStyle(.secondary)
-                }
-            }
-            .padding(Spacing.sm.rawValue)
-            .background(Color.bgSecondary(scheme: colorScheme))
+            footerActions
         }
-        .frame(width: 350, maxHeight: 450)
+        .frame(width: 350)
+        .frame(maxHeight: 450)
         .sheet(isPresented: $showAddProject) {
             AddProjectSheet(projectManager: projectManager)
         }
         .onChange(of: searchText) { _, newValue in
             projectManager.searchText = newValue
         }
+    }
+
+    // MARK: - View Components
+
+    @ViewBuilder
+    private var searchField: some View {
+        HStack(spacing: Spacing.sm.rawValue) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(Color.fgTertiary(scheme: colorScheme))
+
+            TextField("Search projects...", text: $searchText)
+                .textFieldStyle(.plain)
+                .font(.bodyText)
+        }
+        .padding(Spacing.sm.rawValue)
+        .background(Color.bgSecondary(scheme: colorScheme))
+    }
+
+    @ViewBuilder
+    private var projectList: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                favoritesSection
+                allProjectsSection
+                emptyStateSection
+            }
+            .padding(Spacing.sm.rawValue)
+        }
+    }
+
+    @ViewBuilder
+    private var favoritesSection: some View {
+        if !favoriteProjects.isEmpty {
+            Section("Favorites") {
+                ForEach(favoriteProjects) { project in
+                    ProjectItemView(
+                        project: project,
+                        isSelected: projectManager.currentProject?.id == project.id,
+                        onSelect: { selectProject(project) },
+                        onToggleFavorite: { projectManager.toggleFavorite(project.id) }
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var allProjectsSection: some View {
+        if !otherProjects.isEmpty {
+            Section(favoriteProjects.isEmpty ? "" : "All Projects") {
+                ForEach(otherProjects) { project in
+                    ProjectItemView(
+                        project: project,
+                        isSelected: projectManager.currentProject?.id == project.id,
+                        onSelect: { selectProject(project) },
+                        onToggleFavorite: { projectManager.toggleFavorite(project.id) }
+                    )
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var emptyStateSection: some View {
+        if projectManager.projects.isEmpty {
+            emptyStateView
+        }
+    }
+
+    @ViewBuilder
+    private var footerActions: some View {
+        HStack {
+            Button(action: { showAddProject = true }) {
+                Label("Add Project", systemImage: "plus")
+            }
+            .buttonStyle(.secondary)
+
+            Spacer()
+
+            if !projectManager.projects.isEmpty {
+                Button("Manage...") {
+                    // Open project management
+                }
+                .buttonStyle(.secondary)
+            }
+        }
+        .padding(Spacing.sm.rawValue)
+        .background(Color.bgSecondary(scheme: colorScheme))
     }
 
     private var favoriteProjects: [Project] {

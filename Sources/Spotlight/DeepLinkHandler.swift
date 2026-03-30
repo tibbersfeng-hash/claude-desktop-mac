@@ -7,6 +7,7 @@ import Foundation
 import AppKit
 import CoreSpotlight
 import UniformTypeIdentifiers
+import Models
 
 // MARK: - Deep Link Manager
 

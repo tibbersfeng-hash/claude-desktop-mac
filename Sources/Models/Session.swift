@@ -103,7 +103,7 @@ public struct SessionSummary: Identifiable, Sendable {
         self.projectName = session.projectName ?? session.projectPath?.split(separator: "/").last.map(String.init)
         self.messageCount = session.messages.count
         self.lastMessageTime = session.messages.last?.timestamp
-        self.preview = session.messages.last?.content.prefix(100).map(String.init)
+        self.preview = session.messages.last.map { String($0.content.prefix(100)) }
     }
 }
 

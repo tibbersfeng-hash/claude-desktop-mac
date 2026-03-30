@@ -6,6 +6,7 @@
 import Foundation
 import UserNotifications
 import AppKit
+import Theme
 
 // MARK: - Quick Reply Handler
 
@@ -231,7 +232,7 @@ public struct QuickReplyPanel: View {
                     Image(systemName: "arrow.up.left.and.arrow.down.right")
                         .foregroundColor(Color.fgSecondary(scheme: colorScheme))
                 }
-                .buttonStyle(.icon())
+                .buttonStyle(.icon)
             }
         }
         .padding()

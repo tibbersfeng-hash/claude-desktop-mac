@@ -5,6 +5,9 @@
 
 import Foundation
 import Combine
+import CLIDetector
+import State
+import ErrorHandling
 
 // MARK: - Recovery Strategy
 
@@ -139,7 +142,7 @@ public final class RecoveryManager: @unchecked Sendable {
                 return .reconnect
             }
 
-        case .protocol:
+        case .messaging:
             return .resetConnection
 
         case .system:

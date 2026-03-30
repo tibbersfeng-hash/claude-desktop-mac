@@ -5,6 +5,7 @@
 
 import SwiftUI
 import Combine
+import Theme
 
 // MARK: - Code Highlighter
 
@@ -465,7 +466,7 @@ public final class CodeHighlighter: Sendable {
             SyntaxPattern(regex: #"<!--[\s\S]*?-->"#, tokenType: .comment),
 
             // Tags
-            SyntaxPattern(regex: #"</?([a-zA-Z][a-zA-Z0-9]*)"?#, tokenType: .keyword),
+            SyntaxPattern(regex: #"</?([a-zA-Z][a-zA-Z0-9]*)"#, tokenType: .keyword),
 
             // Attributes
             SyntaxPattern(regex: #"\b([a-zA-Z_-][a-zA-Z0-9_-]*)\s*="#, tokenType: .variable),

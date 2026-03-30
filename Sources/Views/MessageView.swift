@@ -4,6 +4,8 @@
 // Displays individual messages with markdown support
 
 import SwiftUI
+import Theme
+import Models
 
 // MARK: - Message View
 
@@ -474,16 +476,18 @@ struct CodeBlockView: View {
 
 // MARK: - Preview
 
-#Preview {
-    VStack {
-        MessageView(message: .user("Can you help me implement an API client?"))
+struct MessageView_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack {
+            MessageView(message: .user("Can you help me implement an API client?"))
 
-        MessageView(message: .assistant(
-            "Here's an implementation:\n\n```swift\nlet client = APIClient()\n```",
-            toolCalls: [.sample]
-        ))
+            MessageView(message: .assistant(
+                "Here's an implementation:\n\n```swift\nlet client = APIClient()\n```",
+                toolCalls: [.sample]
+            ))
+        }
+        .padding()
+        .frame(width: 600)
+        .background(Color.bgPrimaryDark)
     }
-    .padding()
-    .frame(width: 600)
-    .background(Color.bgPrimaryDark)
 }

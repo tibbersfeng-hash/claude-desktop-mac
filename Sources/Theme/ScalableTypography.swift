@@ -64,6 +64,8 @@ public enum ScalableFontStyle: String, CaseIterable {
             return 1.8
         case .code:
             return 1.5 // Code should stay readable
+        case .cardTitle:
+            return 1.5
         }
     }
 }
@@ -107,11 +109,17 @@ extension View {
 // MARK: - Dynamic Type Scaling Modifier
 
 public struct DynamicTypeScalingModifier: ViewModifier {
-    let style: ScalableFontStyle
-    let minScale: CGFloat
-    let maxScale: CGFloat
+    public let style: ScalableFontStyle
+    public let minScale: CGFloat
+    public let maxScale: CGFloat
 
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
+
+    public init(style: ScalableFontStyle, minScale: CGFloat, maxScale: CGFloat) {
+        self.style = style
+        self.minScale = minScale
+        self.maxScale = maxScale
+    }
 
     public func body(content: Content) -> some View {
         let scaleFactor = min(maxScale, max(minScale, dynamicTypeSize.scaleFactor(style: style)))
@@ -158,8 +166,12 @@ extension DynamicTypeSize {
 // MARK: - Dynamic Spacing Modifier
 
 public struct DynamicSpacingModifier: ViewModifier {
-    let baseSpacing: Spacing
+    public let baseSpacing: Spacing
     @Environment(\.dynamicTypeSize) var dynamicTypeSize
+
+    public init(baseSpacing: Spacing) {
+        self.baseSpacing = baseSpacing
+    }
 
     public func body(content: Content) -> some View {
         let scaleFactor = dynamicTypeSize.scaleFactor(style: .body)

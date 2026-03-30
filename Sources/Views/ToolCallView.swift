@@ -4,6 +4,8 @@
 // Displays tool calls with expandable details
 
 import SwiftUI
+import Theme
+import Models
 
 // MARK: - Tool Call View
 
@@ -374,33 +376,35 @@ public struct RunningToolCallView: View {
 
 // MARK: - Preview
 
-#Preview {
-    VStack(spacing: 16) {
-        ToolCallView(toolCall: ToolCallDisplay(
-            name: "Read",
-            arguments: "{ \"file_path\": \"/src/api/client.swift\" }",
-            result: "245 lines read",
-            status: .success,
-            duration: 0.15,
-            isExpanded: true
-        ))
+struct ToolCallView_Previews: PreviewProvider {
+    static var previews: some View {
+        VStack(spacing: 16) {
+            ToolCallView(toolCall: ToolCallDisplay(
+                name: "Read",
+                arguments: "{ \"file_path\": \"/src/api/client.swift\" }",
+                result: "245 lines read",
+                status: .success,
+                duration: 0.15,
+                isExpanded: true
+            ))
 
-        ToolCallView(toolCall: ToolCallDisplay(
-            name: "Edit",
-            arguments: "{ \"file_path\": \"/src/api/client.swift\" }",
-            error: "Edit failed: could not find exact match",
-            status: .error,
-            isExpanded: true
-        ))
+            ToolCallView(toolCall: ToolCallDisplay(
+                name: "Edit",
+                arguments: "{ \"file_path\": \"/src/api/client.swift\" }",
+                error: "Edit failed: could not find exact match",
+                status: .error,
+                isExpanded: true
+            ))
 
-        ToolCallView(toolCall: ToolCallDisplay(
-            name: "Grep",
-            arguments: "{ \"pattern\": \"func.*api\" }",
-            status: .running,
-            isExpanded: false
-        ))
+            ToolCallView(toolCall: ToolCallDisplay(
+                name: "Grep",
+                arguments: "{ \"pattern\": \"func.*api\" }",
+                status: .running,
+                isExpanded: false
+            ))
+        }
+        .padding()
+        .frame(width: 500)
+        .background(Color.bgPrimaryDark)
     }
-    .padding()
-    .frame(width: 500)
-    .background(Color.bgPrimaryDark)
 }

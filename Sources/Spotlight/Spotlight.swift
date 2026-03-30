@@ -4,8 +4,11 @@
 // Public exports for Spotlight module
 
 import Foundation
+import Models
+import Project
 
 // Spotlight Module
+@MainActor
 public enum Spotlight {
     /// Initialize Spotlight integration
     public static func initialize() {

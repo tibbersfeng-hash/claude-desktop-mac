@@ -5,11 +5,13 @@
 
 import Foundation
 import UserNotifications
+import Theme
 
 // MARK: - Notification Handler
 
 /// Handles notification events and conditions
 @MainActor
+@Observable
 public final class NotificationHandler {
 
     // MARK: - Singleton
@@ -114,11 +116,18 @@ public final class NotificationHandler {
         let endTime = calendar.dateComponents([.hour, .minute], from: quietHours.end)
 
         // Compare time components
-        guard let currentMinutes = currentTime.hour! * 60 + currentTime.minute!,
-              let startMinutes = startTime.hour! * 60 + startTime.minute!,
-              let endMinutes = endTime.hour! * 60 + endTime.minute! else {
+        guard let currentHour = currentTime.hour,
+              let currentMinute = currentTime.minute,
+              let startHour = startTime.hour,
+              let startMinute = startTime.minute,
+              let endHour = endTime.hour,
+              let endMinute = endTime.minute else {
             return false
         }
+
+        let currentMinutes = currentHour * 60 + currentMinute
+        let startMinutes = startHour * 60 + startMinute
+        let endMinutes = endHour * 60 + endMinute
 
         if startMinutes <= endMinutes {
             // Same day range
@@ -258,8 +267,8 @@ import SwiftUI
 
 /// Settings view for notifications
 public struct NotificationSettingsView: View {
-    @StateObject private var handler = NotificationHandler.shared
-    @StateObject private var manager = NotificationManager.shared
+    @State private var handler = NotificationHandler.shared
+    @State private var manager = NotificationManager.shared
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss

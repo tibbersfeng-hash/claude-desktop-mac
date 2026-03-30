@@ -5,6 +5,8 @@
 
 import SwiftUI
 import Combine
+import Theme
+import Highlighting
 
 // MARK: - CLAUDE.md Template
 

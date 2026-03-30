@@ -6,6 +6,8 @@
 import Foundation
 import CoreSpotlight
 import UniformTypeIdentifiers
+import Models
+import Project
 
 // MARK: - Spotlight Index Manager
 

@@ -4,6 +4,9 @@
 // Displays session list and navigation
 
 import SwiftUI
+import Theme
+import Models
+import ViewModels
 
 // MARK: - Sidebar View
 
@@ -390,18 +393,20 @@ struct SidebarFooter: View {
 
 // MARK: - Preview
 
-#Preview {
-    HStack(spacing: 0) {
-        SidebarView(
-            viewModel: {
-                let vm = SessionListViewModel()
-                vm.sessions = Session.samples
-                return vm
-            }()
-        )
-        .frame(width: WindowDimensions.sidebarWidth)
+struct SidebarView_Previews: PreviewProvider {
+    static var previews: some View {
+        HStack(spacing: 0) {
+            SidebarView(
+                viewModel: {
+                    let vm = SessionListViewModel()
+                    vm.sessions = Session.samples
+                    return vm
+                }()
+            )
+            .frame(width: WindowDimensions.sidebarWidth)
 
-        Color.bgPrimaryDark
+            Color.bgPrimaryDark
+        }
+        .frame(width: 600, height: 600)
     }
-    .frame(width: 600, height: 600)
 }
