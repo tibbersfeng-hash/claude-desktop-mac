@@ -228,10 +228,25 @@ public final class ChatViewModel {
         messages.removeAll { $0.id == messageId }
     }
 
-    /// Edit a message
-    public func editMessage(_ messageId: UUID, newContent: String) {
+    /// Edit a user message and optionally regenerate AI response
+    public func editUserMessage(_ messageId: UUID, newContent: String, regenerate: Bool = false) async {
         guard let index = messages.firstIndex(where: { $0.id == messageId }) else { return }
-        messages[index].content = newContent
+        let originalMessage = messages[index]
+
+        guard originalMessage.role == .user else { return }
+
+        // Update the message with edited content
+        messages[index] = originalMessage.withEditedContent(newContent)
+
+        // If regenerate is true, remove subsequent messages and resend
+        if regenerate {
+            // Remove all messages after the edited one
+            messages = Array(messages.prefix(through: index))
+
+            // Set input and resend
+            inputState.text = newContent
+            await sendMessage()
+        }
     }
 
     // MARK: - Scrolling
@@ -332,11 +347,16 @@ public final class ChatViewModel {
 // MARK: - Helper Extensions
 
 extension ChatViewModel {
-    /// Create a formatted time string
-    public func formattedTime(for message: ChatMessage) -> String {
+    /// Cached date formatter for performance
+    private static let timeFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
-        return formatter.string(from: message.timestamp)
+        return formatter
+    }()
+
+    /// Create a formatted time string
+    public func formattedTime(for message: ChatMessage) -> String {
+        return Self.timeFormatter.string(from: message.timestamp)
     }
 
     /// Group messages by date

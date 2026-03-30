@@ -14,9 +14,11 @@ public struct MessageView: View {
     @Environment(\.reduceMotion) private var reduceMotion
 
     let message: ChatMessage
+    let onEdit: ((ChatMessage) -> Void)?
 
-    public init(message: ChatMessage) {
+    public init(message: ChatMessage, onEdit: ((ChatMessage) -> Void)? = nil) {
         self.message = message
+        self.onEdit = onEdit
     }
 
     public var body: some View {
@@ -29,7 +31,14 @@ public struct MessageView: View {
             // Message content
             Group {
                 if message.role == .user {
-                    UserMessageContent(content: message.content, timestamp: message.formattedTime)
+                    UserMessageContent(
+                        content: message.content,
+                        timestamp: message.formattedTime,
+                        isEdited: message.isEdited,
+                        onEdit: onEdit != nil ? { newContent in
+                            onEdit?(message.withEditedContent(newContent))
+                        } : nil
+                    )
                 } else {
                     AssistantMessageContent(
                         content: message.content,
@@ -81,29 +90,71 @@ struct UserMessageContent: View {
 
     let content: String
     let timestamp: String
+    let isEdited: Bool
+    let onEdit: ((String) -> Void)?
 
     @State private var isHovered = false
+    @State private var isEditing = false
+    @State private var editedContent: String = ""
+    @FocusState private var isTextFieldFocused: Bool
 
     var body: some View {
         VStack(alignment: .trailing, spacing: Spacing.sm.rawValue) {
-            Text(content)
-                .font(.userMessage)
-                .foregroundColor(Color.fgPrimary(scheme: colorScheme))
-                .textSelection(.enabled)
+            if isEditing {
+                // Editing mode
+                VStack(alignment: .trailing, spacing: Spacing.sm.rawValue) {
+                    TextEditor(text: $editedContent)
+                        .font(.userMessage)
+                        .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+                        .frame(minHeight: 60, maxHeight: 200)
+                        .padding(Spacing.sm.rawValue)
+                        .background(Color.bgSecondary(scheme: colorScheme))
+                        .cornerRadius(CornerRadius.md.rawValue)
+                        .focused($isTextFieldFocused)
 
-            HStack(spacing: Spacing.sm.rawValue) {
-                Text(timestamp)
-                    .font(.messageMetadata)
-                    .foregroundColor(Color.fgTertiary(scheme: colorScheme))
+                    HStack(spacing: Spacing.sm.rawValue) {
+                        Button("Cancel") {
+                            cancelEditing()
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(Color.fgSecondary(scheme: colorScheme))
 
-                if isHovered {
-                    Button(action: {}) {
-                        Image(systemName: "pencil")
-                            .font(.system(size: 10))
+                        Button("Save") {
+                            saveEditing()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(editedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
-                    .buttonStyle(.icon(size: 20))
-                    .accessibilityLabel("Edit message")
-                    .accessibilityHint("Double tap to edit this message")
+                    .font(.captionText)
+                }
+            } else {
+                // Display mode
+                Text(content)
+                    .font(.userMessage)
+                    .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+                    .textSelection(.enabled)
+
+                HStack(spacing: Spacing.sm.rawValue) {
+                    if isEdited {
+                        Text("(edited)")
+                            .font(.messageMetadata)
+                            .foregroundColor(Color.fgTertiary(scheme: colorScheme))
+                            .italic()
+                    }
+
+                    Text(timestamp)
+                        .font(.messageMetadata)
+                        .foregroundColor(Color.fgTertiary(scheme: colorScheme))
+
+                    if isHovered && onEdit != nil {
+                        Button(action: startEditing) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.icon(size: 20))
+                        .accessibilityLabel("Edit message")
+                        .accessibilityHint("Double tap to edit this message")
+                    }
                 }
             }
         }
@@ -119,6 +170,27 @@ struct UserMessageContent: View {
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Your message: \(content)")
         .accessibilityHint("Sent at \(timestamp)")
+    }
+
+    private func startEditing() {
+        editedContent = content
+        isEditing = true
+        isTextFieldFocused = true
+    }
+
+    private func cancelEditing() {
+        editedContent = ""
+        isEditing = false
+    }
+
+    private func saveEditing() {
+        let trimmedContent = editedContent.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedContent.isEmpty, trimmedContent != content else {
+            cancelEditing()
+            return
+        }
+        onEdit?(trimmedContent)
+        isEditing = false
     }
 }
 

@@ -64,6 +64,7 @@ public struct ChatMessage: Identifiable, Codable, Sendable {
     public var toolCalls: [ToolCallDisplay]?
     public var timestamp: Date
     public var status: MessageStatus
+    public var isEdited: Bool
 
     public init(
         id: UUID = UUID(),
@@ -71,7 +72,8 @@ public struct ChatMessage: Identifiable, Codable, Sendable {
         content: String,
         toolCalls: [ToolCallDisplay]? = nil,
         timestamp: Date = Date(),
-        status: MessageStatus = .completed
+        status: MessageStatus = .completed,
+        isEdited: Bool = false
     ) {
         self.id = id
         self.role = role
@@ -79,6 +81,7 @@ public struct ChatMessage: Identifiable, Codable, Sendable {
         self.toolCalls = toolCalls
         self.timestamp = timestamp
         self.status = status
+        self.isEdited = isEdited
     }
 
     /// Create a user message
@@ -94,6 +97,19 @@ public struct ChatMessage: Identifiable, Codable, Sendable {
     /// Create a system message
     public static func system(_ content: String) -> ChatMessage {
         ChatMessage(role: .system, content: content)
+    }
+
+    /// Create an edited version of this message
+    public func withEditedContent(_ newContent: String) -> ChatMessage {
+        ChatMessage(
+            id: id,
+            role: role,
+            content: newContent,
+            toolCalls: toolCalls,
+            timestamp: timestamp,
+            status: status,
+            isEdited: true
+        )
     }
 
     /// Formatted timestamp

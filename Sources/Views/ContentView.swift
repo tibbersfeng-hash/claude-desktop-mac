@@ -8,6 +8,7 @@ import Theme
 import Models
 import ViewModels
 import State
+import Combine
 
 // MARK: - Content View
 
@@ -214,28 +215,163 @@ struct SettingsView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.dismiss) private var dismiss
 
-    var body: some View {
-        VStack(spacing: Spacing.lg.rawValue) {
-            Text("Settings")
-                .font(.title2)
-                .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+    @State private var selectedTab: SettingsTab = .mcp
+    @State private var mcpViewModel: MCPManagerViewModel = MCPManagerViewModel()
 
-            // Settings content would go here
+    enum SettingsTab: String, CaseIterable {
+        case mcp = "MCP Servers"
+        case general = "General"
+        case about = "About"
+
+        var iconName: String {
+            switch self {
+            case .mcp: return "server.rack"
+            case .general: return "gearshape"
+            case .about: return "info.circle"
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Tab Bar
+            HStack(spacing: 0) {
+                ForEach(SettingsTab.allCases, id: \.self) { tab in
+                    Button(action: { selectedTab = tab }) {
+                        HStack(spacing: Spacing.sm.rawValue) {
+                            Image(systemName: tab.iconName)
+                                .font(.system(size: 14))
+                            Text(tab.rawValue)
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(selectedTab == tab
+                            ? Color.fgPrimary(scheme: colorScheme)
+                            : Color.fgSecondary(scheme: colorScheme))
+                        .padding(.horizontal, Spacing.lg.rawValue)
+                        .padding(.vertical, Spacing.md.rawValue)
+                        .background(selectedTab == tab
+                            ? Color.bgTertiary(scheme: colorScheme)
+                            : Color.clear)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .background(Color.bgSecondary(scheme: colorScheme))
+
+            Divider()
+                .background(Color.fgTertiary(scheme: colorScheme).opacity(0.3))
+
+            // Tab Content
+            Group {
+                switch selectedTab {
+                case .mcp:
+                    MCPManagerView(viewModel: mcpViewModel)
+                case .general:
+                    GeneralSettingsView()
+                case .about:
+                    AboutSettingsView()
+                }
+            }
+        }
+        .frame(width: 600, height: 500)
+        .background(Color.bgPrimary(scheme: colorScheme))
+    }
+}
+
+// MARK: - General Settings View
+
+struct GeneralSettingsView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    @AppStorage("autoConnect") private var autoConnect: Bool = true
+    @AppStorage("showNotifications") private var showNotifications: Bool = true
+    @AppStorage("defaultModel") private var defaultModel: String = "claude-sonnet-4.6"
+
+    private let availableModels = [
+        "claude-sonnet-4.6",
+        "claude-opus-4.6",
+        "claude-haiku-4.5"
+    ]
+
+    var body: some View {
+        Form {
+            Section("Connection") {
+                Toggle("Auto-connect on launch", isOn: $autoConnect)
+            }
+
+            Section("Notifications") {
+                Toggle("Show notifications", isOn: $showNotifications)
+            }
+
+            Section("Model") {
+                Picker("Default Model", selection: $defaultModel) {
+                    ForEach(availableModels, id: \.self) { model in
+                        Text(model).tag(model)
+                    }
+                }
+                .pickerStyle(.menu)
+            }
+        }
+        .formStyle(.grouped)
+        .padding(Spacing.md.rawValue)
+    }
+}
+
+// MARK: - About Settings View
+
+struct AboutSettingsView: View {
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(spacing: Spacing.xl.rawValue) {
+            // App Icon
+            Image(systemName: "bubble.left.and.exclamationmark.bubble.right.fill")
+                .font(.system(size: 64))
+                .foregroundColor(.accentPrimary)
+
+            // App Info
+            VStack(spacing: Spacing.sm.rawValue) {
+                Text("Claude Desktop Mac")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                    .foregroundColor(Color.fgPrimary(scheme: colorScheme))
+
+                Text("Version 1.0.0")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+
+                Text("A native macOS client for Claude Code CLI")
+                    .font(.system(size: 14))
+                    .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+                    .multilineTextAlignment(.center)
+            }
+
+            Divider()
+                .background(Color.fgTertiary(scheme: colorScheme).opacity(0.3))
+                .frame(width: 200)
+
+            // Links
+            VStack(spacing: Spacing.md.rawValue) {
+                Link(destination: URL(string: "https://github.com/anthropics/claude-code")!) {
+                    Label("GitHub Repository", systemImage: "link")
+                        .foregroundColor(.accentPrimary)
+                }
+
+                Link(destination: URL(string: "https://docs.anthropic.com")!) {
+                    Label("Documentation", systemImage: "book")
+                        .foregroundColor(.accentPrimary)
+                }
+            }
 
             Spacer()
 
-            HStack {
-                Spacer()
-
-                Button("Done") {
-                    dismiss()
-                }
-                .buttonStyle(.primary)
-            }
+            // Footer
+            Text("Built with SwiftUI for macOS")
+                .font(.system(size: 12))
+                .foregroundColor(Color.fgTertiary(scheme: colorScheme))
         }
         .padding(Spacing.xl.rawValue)
-        .frame(width: 400, height: 300)
-        .background(Color.bgPrimary(scheme: colorScheme))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
