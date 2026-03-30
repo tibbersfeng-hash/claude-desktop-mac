@@ -1,7 +1,7 @@
 // MessageSerializer.swift
 // Claude Desktop Mac - Message Serializer Module
 //
-// Handles serialization and deserialization of messages
+// Handles serialization and deserialization of CLI messages
 
 import Foundation
 
@@ -14,6 +14,7 @@ public enum SerializationError: Error, Sendable, LocalizedError {
     case invalidJSON(String)
     case invalidFormat(String)
     case missingField(String)
+    case unknownEventType(String)
 
     public var errorDescription: String? {
         switch self {
@@ -27,6 +28,8 @@ public enum SerializationError: Error, Sendable, LocalizedError {
             return "Invalid format: \(reason)"
         case .missingField(let field):
             return "Missing required field: \(field)"
+        case .unknownEventType(let type):
+            return "Unknown event type: \(type)"
         }
     }
 }
@@ -38,9 +41,6 @@ public final class MessageSerializer: Sendable {
 
     // MARK: - Properties
 
-    /// JSON encoder with custom configuration
-    private let encoder: JSONEncoder
-
     /// JSON decoder with custom configuration
     private let decoder: JSONDecoder
 
@@ -51,191 +51,242 @@ public final class MessageSerializer: Sendable {
     // MARK: - Initialization
 
     public init() {
-        encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.sortedKeys]
-
         decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
     }
 
-    // MARK: - Serialization
+    // MARK: - Input Serialization
 
-    /// Encode an outgoing message to JSON data
-    public func encode(_ message: OutgoingMessage) throws -> Data {
-        do {
-            return try encoder.encode(message)
-        } catch {
-            throw SerializationError.encodingFailed(error.localizedDescription)
+    /// Encode a text message for sending to CLI (stdin)
+    /// The CLI accepts plain text input with newline delimiter
+    public func encodeInput(_ text: String) -> Data {
+        // Add newline if not present
+        let normalizedText = text.hasSuffix("\n") ? text : text + "\n"
+        return Data(normalizedText.utf8)
+    }
+
+    /// Encode a text message for sending to CLI with resume session
+    public func encodeInput(_ text: String, resumeSessionId sessionId: String?) -> (data: Data, args: [String]) {
+        var args: [String] = []
+
+        if let sessionId = sessionId {
+            args = ["--resume", sessionId]
+        }
+
+        return (encodeInput(text), args)
+    }
+
+    // MARK: - Output Deserialization
+
+    /// Parse a single line of JSON output from CLI
+    public func parseLine(_ line: String) -> ParsedEvent? {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        guard let data = trimmed.data(using: .utf8) else {
+            return nil
+        }
+
+        return try? parseEvent(data)
+    }
+
+    /// Parse event data from CLI
+    public func parseEvent(_ data: Data) throws -> ParsedEvent {
+        // First, try to determine the event type
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let typeString = json["type"] as? String,
+              let eventType = CLIEventType(rawValue: typeString) else {
+            throw SerializationError.missingField("type")
+        }
+
+        switch eventType {
+        case .system:
+            return try parseSystemEvent(data, json: json)
+        case .assistant:
+            return try parseAssistantEvent(data)
+        case .result:
+            return try parseResultEvent(data)
+        case .user:
+            // User events are typically not sent by CLI, but handle gracefully
+            return .unknown(data)
         }
     }
 
-    /// Encode an outgoing message to JSON string
-    public func encodeToString(_ message: OutgoingMessage) throws -> String {
-        let data = try encode(message)
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw SerializationError.encodingFailed("Failed to convert data to string")
+    /// Parse system event
+    private func parseSystemEvent(_ data: Data, json: [String: Any]) throws -> ParsedEvent {
+        guard let subtypeString = json["subtype"] as? String else {
+            throw SerializationError.missingField("subtype")
         }
-        return string
-    }
 
-    /// Encode an outgoing message with newline delimiter
-    public func encodeWithNewline(_ message: OutgoingMessage) throws -> Data {
-        var data = try encode(message)
-        data.append(contentsOf: [0x0A]) // newline
-        return data
-    }
-
-    // MARK: - Deserialization
-
-    /// Decode an incoming message from JSON data
-    public func decode(_ data: Data) throws -> IncomingMessage {
-        do {
-            return try decoder.decode(IncomingMessage.self, from: data)
-        } catch {
-            throw SerializationError.decodingFailed(error.localizedDescription)
+        switch subtypeString {
+        case "init":
+            let event = try decoder.decode(SystemInitEvent.self, from: data)
+            return .systemInit(event)
+        case "hook_started", "hook_ended":
+            let event = try decoder.decode(SystemHookEvent.self, from: data)
+            return .systemHook(event)
+        default:
+            return .unknown(data)
         }
     }
 
-    /// Decode an incoming message from JSON string
-    public func decodeFromString(_ string: String) throws -> IncomingMessage {
-        guard let data = string.data(using: .utf8) else {
-            throw SerializationError.invalidJSON("Failed to convert string to data")
-        }
-        return try decode(data)
+    /// Parse assistant event
+    private func parseAssistantEvent(_ data: Data) throws -> ParsedEvent {
+        let event = try decoder.decode(AssistantEvent.self, from: data)
+        return .assistant(event)
     }
 
-    /// Decode multiple messages from newline-delimited JSON
-    public func decodeMultiple(_ data: Data) throws -> [IncomingMessage] {
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw SerializationError.invalidJSON("Failed to convert data to string")
-        }
+    /// Parse result event
+    private func parseResultEvent(_ data: Data) throws -> ParsedEvent {
+        let event = try decoder.decode(ResultEvent.self, from: data)
+        return .result(event)
+    }
 
-        let lines = string.split(separator: "\n", omittingEmptySubsequences: true)
-        var messages: [IncomingMessage] = []
+    // MARK: - Stream Parsing
 
-        for line in lines {
-            guard let lineData = String(line).data(using: .utf8) else { continue }
-            do {
-                let message = try decode(lineData)
-                messages.append(message)
-            } catch {
-                // Skip invalid lines
-                continue
+    /// Parse multiple lines of JSON output
+    public func parseLines(_ text: String) -> [ParsedEvent] {
+        var events: [ParsedEvent] = []
+
+        for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
+            if let event = parseLine(String(line)) {
+                events.append(event)
             }
         }
 
-        return messages
-    }
-
-    // MARK: - Partial Parsing
-
-    /// Try to parse partial JSON (for streaming scenarios)
-    public func parsePartial(_ string: String) -> PartialParseResult {
-        // Find complete JSON objects
-        var completeMessages: [IncomingMessage] = []
-        var remaining = string
-
-        while let endIndex = findJSONEnd(in: remaining) {
-            let jsonString = String(remaining[remaining.startIndex..<endIndex])
-            remaining = String(remaining[endIndex...])
-
-            // Trim whitespace
-            let trimmed = jsonString.trimmingCharacters(in: .whitespacesAndNewlines)
-
-            guard !trimmed.isEmpty else { continue }
-
-            if let data = trimmed.data(using: .utf8) {
-                do {
-                    let message = try decode(data)
-                    completeMessages.append(message)
-                } catch {
-                    // Invalid JSON, skip
-                }
-            }
-        }
-
-        return PartialParseResult(
-            completeMessages: completeMessages,
-            remainingData: remaining
-        )
-    }
-
-    /// Find the end of a JSON object
-    private func findJSONEnd(in string: String) -> String.Index? {
-        var braceCount = 0
-        var inString = false
-        var escape = false
-
-        for (index, char) in string.enumerated() {
-            if escape {
-                escape = false
-                continue
-            }
-
-            if char == "\\" && inString {
-                escape = true
-                continue
-            }
-
-            if char == "\"" {
-                inString.toggle()
-                continue
-            }
-
-            if !inString {
-                if char == "{" {
-                    braceCount += 1
-                } else if char == "}" {
-                    braceCount -= 1
-                    if braceCount == 0 {
-                        return string.index(string.startIndex, offsetBy: index + 1)
-                    }
-                }
-            }
-        }
-
-        return nil
+        return events
     }
 }
 
-// MARK: - Partial Parse Result
+// MARK: - Stream Parser State
 
-/// Result of partial JSON parsing
-public struct PartialParseResult: Sendable {
-    public let completeMessages: [IncomingMessage]
-    public let remainingData: String
+/// Stateful parser for streaming CLI output
+public final class StreamParser: @unchecked Sendable {
+    private var buffer: String = ""
+    private let lock = NSLock()
 
-    public init(completeMessages: [IncomingMessage], remainingData: String) {
-        self.completeMessages = completeMessages
-        self.remainingData = remainingData
+    /// Initialize a new stream parser
+    public init() {}
+
+    /// Append data to the buffer and extract complete events
+    public func append(_ data: Data) -> [ParsedEvent] {
+        guard let text = String(data: data, encoding: .utf8) else {
+            return []
+        }
+        return append(text)
+    }
+
+    /// Append text to the buffer and extract complete events
+    public func append(_ text: String) -> [ParsedEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+
+        buffer += text
+        var events: [ParsedEvent] = []
+
+        // Process complete lines
+        while let newlineIndex = buffer.firstIndex(of: "\n") {
+            let line = String(buffer[buffer.startIndex..<newlineIndex])
+            buffer = String(buffer[buffer.index(after: newlineIndex)...])
+
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+
+            if let event = MessageSerializer.shared.parseLine(trimmed) {
+                events.append(event)
+            }
+        }
+
+        return events
+    }
+
+    /// Get any remaining data in the buffer
+    public func remainingBuffer() -> String {
+        lock.lock()
+        defer { lock.unlock() }
+        return buffer
+    }
+
+    /// Clear the buffer
+    public func reset() {
+        lock.lock()
+        defer { lock.unlock() }
+        buffer = ""
+    }
+}
+
+// MARK: - Event Filter
+
+/// Filter and process parsed events
+public struct EventFilter: Sendable {
+
+    /// Extract text content from events
+    public static func extractText(from events: [ParsedEvent]) -> String {
+        var texts: [String] = []
+
+        for event in events {
+            switch event {
+            case .assistant(let assistantEvent):
+                texts.append(assistantEvent.textContent)
+            case .result(let resultEvent):
+                if let result = resultEvent.result {
+                    texts.append(result)
+                }
+            default:
+                break
+            }
+        }
+
+        return texts.joined()
+    }
+
+    /// Extract session ID from events
+    public static func extractSessionId(from events: [ParsedEvent]) -> String? {
+        for event in events {
+            if let sessionId = event.sessionId {
+                return sessionId
+            }
+        }
+        return nil
+    }
+
+    /// Check if any event indicates an error
+    public static func hasError(in events: [ParsedEvent]) -> (hasError: Bool, message: String?) {
+        for event in events {
+            switch event {
+            case .result(let resultEvent):
+                if resultEvent.isError {
+                    return (true, resultEvent.result)
+                }
+            default:
+                break
+            }
+        }
+        return (false, nil)
+    }
+
+    /// Check if any event indicates completion
+    public static func isComplete(in events: [ParsedEvent]) -> Bool {
+        for event in events {
+            if case .result(_) = event {
+                return true
+            }
+        }
+        return false
     }
 }
 
 // MARK: - Message Builder
 
-/// Helper for building messages
+/// Helper for building CLI input messages
 public struct MessageBuilder: Sendable {
 
-    /// Create a text message
-    public static func text(_ content: String, sessionId: String? = nil) -> OutgoingMessage {
-        OutgoingMessage.text(content, sessionId: sessionId)
+    /// Create a simple text input
+    public static func text(_ content: String) -> String {
+        return content
     }
 
-    /// Create a command message
-    public static func command(_ command: String, sessionId: String? = nil) -> OutgoingMessage {
-        OutgoingMessage(type: .command, content: command, sessionId: sessionId)
-    }
-
-    /// Create an interrupt message
-    public static func interrupt(sessionId: String? = nil) -> OutgoingMessage {
-        OutgoingMessage.interrupt(sessionId: sessionId)
-    }
-
-    /// Create a ping message
-    public static func ping() -> OutgoingMessage {
-        OutgoingMessage.ping()
+    /// Create a text input with command
+    public static func text(_ content: String, command: String) -> String {
+        return "\(command): \(content)"
     }
 }

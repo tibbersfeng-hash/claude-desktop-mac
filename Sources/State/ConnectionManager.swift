@@ -125,40 +125,14 @@ public final class ConnectionManager: @unchecked Sendable {
         cliPath = detectionResult.path
         cliVersion = detectionResult.version
 
-        // Step 2: Start CLI process
+        // For this implementation, we don't start a persistent CLI process.
+        // Instead, we spawn a new process for each message (simpler and more reliable).
+        // Mark as connected once CLI is detected
         lock.lock()
-        state = .connecting
+        state = .connected
+        currentSessionId = nil // Will be set from CLI response
+        reconnectAttempt = 0
         lock.unlock()
-
-        do {
-            let processInfo = try await processManager.start(
-                path: detectionResult.path!,
-                arguments: ["--stdio"]
-            )
-
-            // Step 3: Connect pipeline
-            guard let input = processManager.standardInput,
-                  let output = processManager.standardOutput else {
-                throw ConnectionError.connectionFailed("Failed to get process pipes")
-            }
-
-            try await pipeline.connect(input: input, output: output)
-
-            // Step 4: Mark connected
-            lock.lock()
-            state = .connected
-            currentSessionId = UUID().uuidString
-            reconnectAttempt = 0
-            lock.unlock()
-
-        } catch let error as ConnectionError {
-            await handleError(error)
-            throw error
-        } catch {
-            let connectionError = ConnectionError.connectionFailed(error.localizedDescription)
-            await handleError(connectionError)
-            throw connectionError
-        }
     }
 
     /// Disconnect from the CLI
@@ -196,10 +170,17 @@ public final class ConnectionManager: @unchecked Sendable {
             throw ConnectionError.cliNotRunning
         }
 
-        let serializer = MessageSerializer.shared
-        let data = try serializer.encodeWithNewline(message)
+        // Format message as JSON for stream-json input format
+        let jsonMessage: [String: Any] = [
+            "type": "user_message",
+            "content": message.content
+        ]
 
-        try await pipeline.write(data)
+        let jsonData = try JSONSerialization.data(withJSONObject: jsonMessage)
+        var dataWithNewline = jsonData
+        dataWithNewline.append(0x0A) // Add newline
+
+        try await pipeline.write(dataWithNewline)
     }
 
     /// Send a text message

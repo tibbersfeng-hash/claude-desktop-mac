@@ -17,7 +17,6 @@ import Models
 // MARK: - App Delegate
 
 /// Main application delegate
-@main
 @MainActor
 public class AppDelegate: NSObject, NSApplicationDelegate {
 

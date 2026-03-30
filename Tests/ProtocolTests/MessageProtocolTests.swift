@@ -8,10 +8,8 @@ final class MessageProtocolTests: XCTestCase {
     func testOutgoingMessageCreation() {
         let message = OutgoingMessage.text("Hello, Claude!")
 
-        XCTAssertEqual(message.type, .text)
         XCTAssertEqual(message.content, "Hello, Claude!")
         XCTAssertNil(message.sessionId)
-        XCTAssertNotNil(message.timestamp)
     }
 
     func testOutgoingMessageWithSessionId() {
@@ -23,52 +21,36 @@ final class MessageProtocolTests: XCTestCase {
     func testInterruptMessage() {
         let message = OutgoingMessage.interrupt(sessionId: "session-456")
 
-        XCTAssertEqual(message.type, .interrupt)
         XCTAssertEqual(message.content, "")
+        XCTAssertEqual(message.sessionId, "session-456")
     }
 
     func testPingMessage() {
         let message = OutgoingMessage.ping()
 
-        XCTAssertEqual(message.type, .ping)
+        XCTAssertEqual(message.content, "")
     }
 
     // MARK: - Incoming Message Tests
 
-    func testIncomingMessageDecoding() throws {
-        let json = """
-        {
-            "type": "text",
-            "content": "Hello from Claude",
-            "is_complete": false
-        }
-        """
-
-        let data = json.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-        let message = try decoder.decode(IncomingMessage.self, from: data)
+    func testIncomingMessageCreation() {
+        let message = IncomingMessage(
+            type: .text,
+            content: "Hello from Claude",
+            isComplete: false
+        )
 
         XCTAssertEqual(message.type, .text)
         XCTAssertEqual(message.content, "Hello from Claude")
         XCTAssertFalse(message.isComplete)
     }
 
-    func testDeltaMessageDecoding() throws {
-        let json = """
-        {
-            "type": "delta",
-            "delta": " world",
-            "is_complete": false
-        }
-        """
-
-        let data = json.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-
-        let message = try decoder.decode(IncomingMessage.self, from: data)
+    func testDeltaMessageCreation() {
+        let message = IncomingMessage(
+            type: .delta,
+            delta: " world",
+            isComplete: false
+        )
 
         XCTAssertEqual(message.type, .delta)
         XCTAssertEqual(message.delta, " world")
@@ -122,5 +104,23 @@ final class MessageProtocolTests: XCTestCase {
         let value = JSONValue.object(["key": .string("value")])
 
         XCTAssertEqual(value.objectValue?["key"]?.stringValue, "value")
+    }
+
+    // MARK: - Event Tests
+
+    func testCLIEventType() {
+        XCTAssertEqual(CLIEventType.system.rawValue, "system")
+        XCTAssertEqual(CLIEventType.assistant.rawValue, "assistant")
+        XCTAssertEqual(CLIEventType.result.rawValue, "result")
+    }
+
+    func testSystemSubtype() {
+        XCTAssertEqual(SystemSubtype.initialized.rawValue, "init")
+        XCTAssertEqual(SystemSubtype.hookStarted.rawValue, "hook_started")
+    }
+
+    func testResultSubtype() {
+        XCTAssertEqual(ResultSubtype.success.rawValue, "success")
+        XCTAssertEqual(ResultSubtype.error.rawValue, "error")
     }
 }

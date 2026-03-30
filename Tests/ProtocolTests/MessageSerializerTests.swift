@@ -17,132 +17,186 @@ final class MessageSerializerTests: XCTestCase {
 
     // MARK: - Encoding Tests
 
-    func testEncodeOutgoingMessage() throws {
-        let message = OutgoingMessage.text("Hello, Claude!")
+    func testEncodeInputText() {
+        let text = "Hello, Claude!"
 
-        let data = try serializer.encode(message)
+        let data = serializer.encodeInput(text)
 
         XCTAssertGreaterThan(data.count, 0)
-
-        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        XCTAssertNotNil(json)
-        XCTAssertEqual(json?["type"] as? String, "text")
-        XCTAssertEqual(json?["content"] as? String, "Hello, Claude!")
+        XCTAssertTrue(String(data: data, encoding: .utf8)?.hasSuffix("\n") ?? false)
     }
 
-    func testEncodeToString() throws {
-        let message = OutgoingMessage.text("Test message")
+    func testEncodeInputWithNewline() {
+        let text = "Test message\n"
 
-        let string = try serializer.encodeToString(message)
+        let data = serializer.encodeInput(text)
 
-        XCTAssertTrue(string.contains("\"type\":\"text\""))
-        XCTAssertTrue(string.contains("\"content\":\"Test message\""))
+        // Should not add another newline
+        let string = String(data: data, encoding: .utf8)
+        XCTAssertEqual(string?.filter { $0 == "\n" }.count, 1)
     }
 
-    func testEncodeWithNewline() throws {
-        let message = OutgoingMessage.text("Test")
+    func testEncodeInputWithSessionId() {
+        let (data, args) = serializer.encodeInput("Hello", resumeSessionId: "session-123")
 
-        let data = try serializer.encodeWithNewline(message)
-
-        XCTAssertTrue(data.last == 0x0A) // Newline character
+        XCTAssertGreaterThan(data.count, 0)
+        XCTAssertEqual(args, ["--resume", "session-123"])
     }
 
-    // MARK: - Decoding Tests
+    // MARK: - Parsing Tests
 
-    func testDecodeIncomingMessage() throws {
+    func testParseLineValid() {
         let json = """
-        {"type":"text","content":"Hello","is_complete":false}
+        {"type":"assistant","message":{"id":"123","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}]},"session_id":"sess-1"}
+        """
+
+        let event = serializer.parseLine(json)
+
+        XCTAssertNotNil(event)
+        if case .assistant(let assistantEvent) = event {
+            XCTAssertEqual(assistantEvent.textContent, "Hello")
+        } else {
+            XCTFail("Expected assistant event")
+        }
+    }
+
+    func testParseLineEmpty() {
+        let event = serializer.parseLine("")
+        XCTAssertNil(event)
+    }
+
+    func testParseLineInvalidJSON() {
+        let event = serializer.parseLine("not valid json")
+        XCTAssertNil(event)
+    }
+
+    // MARK: - Event Parsing Tests
+
+    func testParseSystemInitEvent() throws {
+        let json = """
+        {"type":"system","subtype":"init","cwd":"/test","session_id":"sess-123","model":"claude-3"}
         """
 
         let data = json.data(using: .utf8)!
-        let message = try serializer.decode(data)
+        let event = try serializer.parseEvent(data)
 
-        XCTAssertEqual(message.type, .text)
-        XCTAssertEqual(message.content, "Hello")
-        XCTAssertFalse(message.isComplete)
+        if case .systemInit(let initEvent) = event {
+            XCTAssertEqual(initEvent.cwd, "/test")
+            XCTAssertEqual(initEvent.sessionId, "sess-123")
+            XCTAssertEqual(initEvent.model, "claude-3")
+        } else {
+            XCTFail("Expected systemInit event")
+        }
     }
 
-    func testDecodeFromString() throws {
+    func testParseResultEvent() throws {
         let json = """
-        {"type":"delta","delta":" test","is_complete":false}
-        """
-
-        let message = try serializer.decodeFromString(json)
-
-        XCTAssertEqual(message.type, .delta)
-        XCTAssertEqual(message.delta, " test")
-    }
-
-    func testDecodeMultiple() throws {
-        let json = """
-        {"type":"text","content":"Line 1","is_complete":false}
-        {"type":"delta","delta":" delta","is_complete":false}
-        {"type":"done","is_complete":true}
+        {"type":"result","subtype":"success","is_error":false,"result":"Done","session_id":"sess-456"}
         """
 
         let data = json.data(using: .utf8)!
-        let messages = try serializer.decodeMultiple(data)
+        let event = try serializer.parseEvent(data)
 
-        XCTAssertEqual(messages.count, 3)
-        XCTAssertEqual(messages[0].type, .text)
-        XCTAssertEqual(messages[1].type, .delta)
-        XCTAssertEqual(messages[2].type, .done)
+        if case .result(let resultEvent) = event {
+            XCTAssertTrue(resultEvent.isSuccess)
+            XCTAssertEqual(resultEvent.result, "Done")
+            XCTAssertEqual(resultEvent.sessionId, "sess-456")
+        } else {
+            XCTFail("Expected result event")
+        }
     }
 
-    // MARK: - Partial Parsing Tests
+    // MARK: - Stream Parser Tests
 
-    func testParsePartialComplete() throws {
+    func testStreamParserSingleEvent() {
+        let parser = StreamParser()
         let json = """
-        {"type":"text","content":"Complete","is_complete":true}
+        {"type":"result","subtype":"success","is_error":false,"result":"Test"}
+
         """
 
-        let result = serializer.parsePartial(json)
+        let events = parser.append(json)
 
-        XCTAssertEqual(result.completeMessages.count, 1)
-        XCTAssertEqual(result.remainingData, "")
+        XCTAssertEqual(events.count, 1)
     }
 
-    func testParsePartialIncomplete() throws {
+    func testStreamParserMultipleEvents() {
+        let parser = StreamParser()
         let json = """
-        {"type":"text","content":"Incomplete"
+        {"type":"system","subtype":"init","session_id":"s1"}
+        {"type":"result","subtype":"success","is_error":false,"result":"Test"}
+
         """
 
-        let result = serializer.parsePartial(json)
+        let events = parser.append(json)
 
-        XCTAssertEqual(result.completeMessages.count, 0)
-        XCTAssertFalse(result.remainingData.isEmpty)
+        XCTAssertEqual(events.count, 2)
     }
 
-    func testParsePartialMultiple() throws {
-        let json = """
-        {"type":"text","content":"First","is_complete":false}
-        {"type":"delta","delta":" second","is_complete":false}
+    func testStreamParserIncompleteEvent() {
+        let parser = StreamParser()
+
+        let events1 = parser.append("{\"type\":\"result\",")
+        XCTAssertEqual(events1.count, 0)
+
+        let events2 = parser.append("\"subtype\":\"success\",\"is_error\":false,\"result\":\"Test\"}\n")
+        XCTAssertEqual(events2.count, 1)
+    }
+
+    func testStreamParserReset() {
+        let parser = StreamParser()
+        _ = parser.append("incomplete json")
+
+        parser.reset()
+
+        XCTAssertEqual(parser.remainingBuffer(), "")
+    }
+
+    // MARK: - Event Filter Tests
+
+    func testEventFilterExtractText() {
+        let json1 = """
+        {"type":"assistant","message":{"id":"1","type":"message","role":"assistant","content":[{"type":"text","text":"Hello"}]},"session_id":"s1"}
+        """
+        let json2 = """
+        {"type":"result","subtype":"success","is_error":false,"result":" World"}
+
         """
 
-        let result = serializer.parsePartial(json)
+        let event1 = serializer.parseLine(json1)
+        let event2 = serializer.parseLine(json2)
 
-        XCTAssertEqual(result.completeMessages.count, 2)
+        var events: [ParsedEvent] = []
+        if let e1 = event1 { events.append(e1) }
+        if let e2 = event2 { events.append(e2) }
+
+        let text = EventFilter.extractText(from: events)
+        XCTAssertEqual(text, "Hello World")
     }
 
-    // MARK: - Message Builder Tests
+    func testEventFilterHasError() {
+        let json = """
+        {"type":"result","subtype":"error","is_error":true,"result":"Something went wrong"}
 
-    func testMessageBuilderText() {
-        let message = MessageBuilder.text("Hello")
+        """
 
-        XCTAssertEqual(message.type, .text)
-        XCTAssertEqual(message.content, "Hello")
+        let event = serializer.parseLine(json)
+        let events = event.map { [$0] } ?? []
+
+        let (hasError, message) = EventFilter.hasError(in: events)
+        XCTAssertTrue(hasError)
+        XCTAssertEqual(message, "Something went wrong")
     }
 
-    func testMessageBuilderInterrupt() {
-        let message = MessageBuilder.interrupt(sessionId: "session-123")
+    func testEventFilterIsComplete() {
+        let json = """
+        {"type":"result","subtype":"success","is_error":false,"result":"Done"}
 
-        XCTAssertEqual(message.type, .interrupt)
-        XCTAssertEqual(message.sessionId, "session-123")
-    }
+        """
 
-    func testMessageBuilderPing() {
-        let message = MessageBuilder.ping()
+        let event = serializer.parseLine(json)
+        let events = event.map { [$0] } ?? []
 
-        XCTAssertEqual(message.type, .ping)
+        XCTAssertTrue(EventFilter.isComplete(in: events))
     }
 }

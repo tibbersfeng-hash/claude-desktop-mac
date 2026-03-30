@@ -6,7 +6,22 @@
       "Bash(xcodebuild -scheme Claude_Desktop_Mac -configuration Debug build)",
       "Bash(xcodebuild -scheme ClaudeDesktopMac -destination 'platform=macOS' build)",
       "Bash(swift test:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(./Scripts/build.sh -c Debug)",
+      "Bash(ls -la .build/debug/*.app)",
+      "Bash(ls *.xcodeproj *.xcworkspace)",
+      "Bash(swift package:*)",
+      "Bash(xed Package.swift)",
+      "Bash(/Users/Tibers/.local/bin/claude --version 2>&1)",
+      "Bash(timeout 3 /Users/Tibers/.local/bin/claude --stdio)",
+      "Bash(claude mcp:*)",
+      "Bash(claude:*)",
+      "Bash(pkill -f ClaudeDesktop)",
+      "Bash(chmod:*)",
+      "Bash(./build-app.sh 2>&1)",
+      "Bash(git rm:*)"
     ]
   }
 }

@@ -192,13 +192,8 @@ public final class CLIProcessManager: @unchecked Sendable {
         let newProcess = Process()
         newProcess.executableURL = URL(fileURLWithPath: path)
 
-        // Set arguments
-        var processArguments = arguments
-        // Add default arguments for interactive mode
-        if !arguments.contains("--stdio") && !arguments.contains("stdio") {
-            processArguments.append(contentsOf: ["--stdio"])
-        }
-        newProcess.arguments = processArguments
+        // Set arguments (no default arguments - caller specifies what's needed)
+        newProcess.arguments = arguments
 
         // Set environment
         var env = ProcessInfo.processInfo.environment
@@ -233,7 +228,7 @@ public final class CLIProcessManager: @unchecked Sendable {
         let info = CLIProcessInfo(
             processIdentifier: newProcess.processIdentifier,
             path: path,
-            arguments: processArguments
+            arguments: arguments
         )
         self.processInfo = info
 

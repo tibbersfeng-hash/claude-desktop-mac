@@ -11,15 +11,15 @@ import Combine
 /// A message in the queue with metadata
 public struct QueuedMessage: Sendable {
     public let id: UUID
-    public let message: OutgoingMessage
+    public let content: String
     public let queuedAt: Date
     public var attemptCount: Int
     public var lastAttemptAt: Date?
     public var status: QueuedMessageStatus
 
-    public init(message: OutgoingMessage) {
+    public init(content: String) {
         self.id = UUID()
-        self.message = message
+        self.content = content
         self.queuedAt = Date()
         self.attemptCount = 0
         self.lastAttemptAt = nil
@@ -74,7 +74,7 @@ public final class MessageQueue: @unchecked Sendable {
 
     /// Add a message to the queue
     @discardableResult
-    public func enqueue(_ message: OutgoingMessage, highPriority: Bool = false) -> UUID {
+    public func enqueue(_ content: String, highPriority: Bool = false) -> UUID {
         lock.lock()
         defer { lock.unlock() }
 
@@ -87,7 +87,7 @@ public final class MessageQueue: @unchecked Sendable {
             }
         }
 
-        let queuedMessage = QueuedMessage(message: message)
+        let queuedMessage = QueuedMessage(content: content)
 
         if highPriority {
             highPriorityQueue.append(queuedMessage)
@@ -100,8 +100,8 @@ public final class MessageQueue: @unchecked Sendable {
     }
 
     /// Add multiple messages to the queue
-    public func enqueue(_ messages: [OutgoingMessage], highPriority: Bool = false) -> [UUID] {
-        return messages.map { enqueue($0, highPriority: highPriority) }
+    public func enqueue(_ contents: [String], highPriority: Bool = false) -> [UUID] {
+        return contents.map { enqueue($0, highPriority: highPriority) }
     }
 
     // MARK: - Dequeue

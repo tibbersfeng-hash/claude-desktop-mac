@@ -132,7 +132,7 @@ public final class CLIConnector: ObservableObject, @unchecked Sendable {
 
     /// Queue a message for sending
     public func queueMessage(_ message: OutgoingMessage, highPriority: Bool = false) -> UUID {
-        return messageQueue.enqueue(message, highPriority: highPriority)
+        return messageQueue.enqueue(message.content, highPriority: highPriority)
     }
 
     /// Get error history

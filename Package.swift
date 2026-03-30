@@ -9,6 +9,9 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
+        .executable(
+            name: "ClaudeDesktop",
+            targets: ["ClaudeDesktop"]),
         .library(
             name: "CLIDetector",
             targets: ["CLIDetector"]),
@@ -156,6 +159,7 @@ let package = Package(
                 "Streaming",
                 "State",
                 "CLIConnector",
+                "CLIDetector",
                 "ErrorHandling"
             ],
             path: "Sources/ViewModels"),
@@ -250,6 +254,15 @@ let package = Package(
             name: "Performance",
             dependencies: [],
             path: "Sources/Performance"),
+
+        // Main executable target
+        .executableTarget(
+            name: "ClaudeDesktop",
+            dependencies: [
+                "ClaudeDesktopUI",
+                "App"
+            ],
+            path: "Sources/ClaudeDesktop"),
 
         // Test Targets
         .testTarget(

@@ -56,9 +56,11 @@ public struct StreamingResponse: Sendable {
     public var isComplete: Bool
     public var startTime: Date
     public var lastUpdateTime: Date
+    public var sessionId: String?
 
-    public init(messageId: String? = nil) {
+    public init(messageId: String? = nil, sessionId: String? = nil) {
         self.messageId = messageId
+        self.sessionId = sessionId
         self.content = ""
         self.deltas = []
         self.toolCalls = []
@@ -124,8 +126,8 @@ public final class StreamingResponseHandler: @unchecked Sendable {
     /// Message serializer
     private let serializer: MessageSerializer
 
-    /// SSE parser
-    private let sseParser: SSEParser
+    /// Stream parser for parsing JSON lines
+    private let streamParser: StreamParser
 
     /// Lock for thread safety
     private let lock = NSLock()
@@ -149,17 +151,17 @@ public final class StreamingResponseHandler: @unchecked Sendable {
 
     public init(serializer: MessageSerializer = .shared) {
         self.serializer = serializer
-        self.sseParser = SSEParser()
+        self.streamParser = StreamParser()
     }
 
     // MARK: - Public Methods
 
     /// Start a new streaming response
-    public func start(messageId: String? = nil) {
+    public func start(messageId: String? = nil, sessionId: String? = nil) {
         lock.lock()
         defer { lock.unlock() }
 
-        currentResponse = StreamingResponse(messageId: messageId)
+        currentResponse = StreamingResponse(messageId: messageId, sessionId: sessionId)
         state = .streaming
         stateSubject.send(.streaming)
 
@@ -167,24 +169,12 @@ public final class StreamingResponseHandler: @unchecked Sendable {
         startTimeoutTimer()
     }
 
-    /// Process incoming data
-    public func processData(_ data: Data) -> [IncomingMessage] {
-        // First try SSE format
-        let sseEvents = sseParser.parse(data)
-
-        if !sseEvents.isEmpty {
-            return processSSEEvents(sseEvents)
-        }
-
-        // Try JSON format
-        do {
-            let messages = try serializer.decodeMultiple(data)
-            return processMessages(messages)
-        } catch {
-            // Handle error
-            handleError(.parseError(error.localizedDescription))
-            return []
-        }
+    /// Process incoming data and return parsed events
+    @discardableResult
+    public func processData(_ data: Data) -> [ParsedEvent] {
+        let events = streamParser.append(data)
+        processEvents(events)
+        return events
     }
 
     /// Cancel the current stream
@@ -213,95 +203,105 @@ public final class StreamingResponseHandler: @unchecked Sendable {
         cancelTimeoutTimer()
         currentResponse = nil
         state = .idle
-        sseParser.reset()
+        streamParser.reset()
         stateSubject.send(.idle)
     }
 
     // MARK: - Private Methods
 
-    private func processSSEEvents(_ events: [SSEEvent]) -> [IncomingMessage] {
-        var messages: [IncomingMessage] = []
-
+    private func processEvents(_ events: [ParsedEvent]) {
         for event in events {
-            do {
-                let message = try serializer.decodeFromString(event.data)
-                messages.append(message)
-                processMessage(message)
-            } catch {
-                // Try to create a text message from the data
-                let message = IncomingMessage(
-                    type: .text,
-                    content: event.data,
-                    isComplete: false
-                )
-                messages.append(message)
-                processMessage(message)
-            }
+            processEvent(event)
         }
-
-        return messages
     }
 
-    private func processMessages(_ messages: [IncomingMessage]) -> [IncomingMessage] {
-        for message in messages {
-            processMessage(message)
-        }
-        return messages
-    }
-
-    private func processMessage(_ message: IncomingMessage) {
+    private func processEvent(_ event: ParsedEvent) {
         lock.lock()
         defer { lock.unlock() }
 
+        switch event {
+        case .systemInit(let initEvent):
+            handleInitEvent(initEvent)
+
+        case .systemHook(_):
+            // Hook events are informational, we can ignore them for now
+            break
+
+        case .assistant(let assistantEvent):
+            handleAssistantEvent(assistantEvent)
+
+        case .result(let resultEvent):
+            handleResultEvent(resultEvent)
+
+        case .unknown(_):
+            // Unknown events are ignored
+            break
+        }
+    }
+
+    private func handleInitEvent(_ event: SystemInitEvent) {
+        // Initialize response with session ID if available
+        if currentResponse == nil {
+            currentResponse = StreamingResponse(sessionId: event.sessionId)
+        } else if var response = currentResponse {
+            response.sessionId = event.sessionId
+            currentResponse = response
+        }
+
+        state = .streaming
+        stateSubject.send(.streaming)
+    }
+
+    private func handleAssistantEvent(_ event: AssistantEvent) {
+        guard var response = currentResponse else {
+            // Create new response if none exists
+            currentResponse = StreamingResponse(sessionId: event.sessionId)
+            return
+        }
+
+        // Extract text content
+        let text = event.textContent
+        if !text.isEmpty {
+            response.appendDelta(text)
+            deltaSubject.send(text)
+        }
+
+        // Update session ID if available
+        if let sessionId = event.sessionId {
+            response.sessionId = sessionId
+        }
+
+        currentResponse = response
+        responseSubject.send(response)
+    }
+
+    private func handleResultEvent(_ event: ResultEvent) {
         guard var response = currentResponse else { return }
 
-        switch message.type {
-        case .text:
-            if let content = message.content {
-                response.setContent(content)
-            }
-
-        case .delta:
-            if let delta = message.delta {
-                response.appendDelta(delta)
-                deltaSubject.send(delta)
-            }
-
-        case .toolCall:
-            if let toolCall = message.toolCall {
-                response.addToolCall(toolCall)
-            }
-
-        case .toolResult:
-            // Handle tool result if needed
-            break
-
-        case .error:
-            if let error = message.error {
-                response.addError(error)
-            }
-
-        case .done:
-            response.complete()
-            cancelTimeoutTimer()
-            state = .completed
-            stateSubject.send(.completed)
-
-        case .pong:
-            // Health check response, ignore
-            break
-
-        case .system:
-            // System message, could log or handle specially
-            break
+        // Set final result content
+        if let result = event.result {
+            response.setContent(result)
         }
 
-        if message.isComplete {
-            response.complete()
-            cancelTimeoutTimer()
-            state = .completed
-            stateSubject.send(.completed)
+        // Update session ID if available
+        if let sessionId = event.sessionId {
+            response.sessionId = sessionId
         }
+
+        // Handle errors
+        if event.isError {
+            let error = MessageError(
+                code: "cli_error",
+                message: event.result ?? "Unknown error"
+            )
+            response.addError(error)
+            handleError(.parseError(event.result ?? "Unknown error"))
+        }
+
+        response.complete()
+        cancelTimeoutTimer()
+        state = .completed
+        stateSubject.send(.completed)
 
         currentResponse = response
         responseSubject.send(response)
