@@ -277,5 +277,26 @@ let package = Package(
             name: "ConnectionTests",
             dependencies: ["State", "CLIConnector"],
             path: "Tests/ConnectionTests"),
+        .testTarget(
+            name: "CLIDetectorTests",
+            dependencies: ["CLIDetector"],
+            path: "Tests/CLIDetectorTests"),
+        .testTarget(
+            name: "CLIManagerTests",
+            dependencies: ["CLIManager"],
+            path: "Tests/CLIManagerTests"),
+        // P0 Feature Tests
+        .testTarget(
+            name: "MessageTests",
+            dependencies: ["Models"],
+            path: "Tests/MessageTests"),
+        .testTarget(
+            name: "MCPTests",
+            dependencies: ["Models"],
+            path: "Tests/MCPTests"),
+        .testTarget(
+            name: "ProjectTests",
+            dependencies: ["Project"],
+            path: "Tests/ProjectTests"),
     ]
 )
