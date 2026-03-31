@@ -169,7 +169,9 @@ let package = Package(
                 "Theme",
                 "Models",
                 "ViewModels",
-                "State"
+                "State",
+                "Upload",
+                "Project"
             ],
             path: "Sources/Views"),
         .target(

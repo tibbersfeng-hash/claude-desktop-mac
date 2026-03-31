@@ -14,20 +14,29 @@ public struct DiffView: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.reduceMotion) private var reduceMotion
 
-    let fileDiff: FileDiff
+    @State private var viewModel: DiffViewModel
     @State private var viewMode: DiffViewMode = .unified
 
-    public init(fileDiff: FileDiff) {
-        self.fileDiff = fileDiff
+    let onAccept: (() -> Void)?
+    let onReject: (() -> Void)?
+
+    public init(
+        fileDiff: FileDiff,
+        onAccept: (() -> Void)? = nil,
+        onReject: (() -> Void)? = nil
+    ) {
+        self._viewModel = State(initialValue: DiffViewModel(fileDiff: fileDiff))
+        self.onAccept = onAccept
+        self.onReject = onReject
     }
 
     public var body: some View {
         VStack(spacing: 0) {
             // Header
             DiffHeaderView(
-                filePath: fileDiff.filePath,
-                additions: fileDiff.additions,
-                deletions: fileDiff.deletions,
+                filePath: viewModel.fileDiff?.filePath ?? "",
+                additions: viewModel.fileDiff?.additions ?? 0,
+                deletions: viewModel.fileDiff?.deletions ?? 0,
                 viewMode: $viewMode
             )
 
@@ -35,28 +44,59 @@ public struct DiffView: View {
                 .background(Color.fgTertiary(scheme: colorScheme).opacity(0.3))
 
             // Diff content
-            ScrollView([.horizontal, .vertical]) {
-                if viewMode == .unified {
-                    UnifiedDiffView(hunks: fileDiff.hunks)
+            if let fileDiff = viewModel.fileDiff {
+                ScrollView([.horizontal, .vertical]) {
+                    if viewMode == .unified {
+                        UnifiedDiffView(
+                            hunks: fileDiff.hunks,
+                            selectedHunkIds: viewModel.selectedHunkIds,
+                            onHunkSelect: { hunkId in
+                                viewModel.toggleHunkSelection(hunkId)
+                            }
+                        )
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
-                } else {
-                    SideBySideDiffView(hunks: fileDiff.hunks)
+                    } else {
+                        SideBySideDiffView(
+                            hunks: fileDiff.hunks,
+                            selectedHunkIds: viewModel.selectedHunkIds,
+                            onHunkSelect: { hunkId in
+                                viewModel.toggleHunkSelection(hunkId)
+                            }
+                        )
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.98)))
+                    }
                 }
+                .scrollIndicators(.automatic)
             }
-            .scrollIndicators(.automatic)
+
+            // Error message
+            if let error = viewModel.errorMessage {
+                HStack(spacing: Spacing.sm.rawValue) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.accentError)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.accentError)
+                }
+                .padding(Spacing.sm.rawValue)
+                .background(Color.accentError.opacity(0.1))
+            }
 
             Divider()
                 .background(Color.fgTertiary(scheme: colorScheme).opacity(0.3))
 
             // Actions
-            DiffActionsView()
+            DiffActionsView(
+                viewModel: viewModel,
+                onAccept: onAccept,
+                onReject: onReject
+            )
         }
         .background(Color.bgPrimary(scheme: colorScheme))
         .cornerRadius(CornerRadius.lg.rawValue)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("File diff for \(fileDiff.fileName)")
-        .accessibilityValue("\(fileDiff.additions) additions, \(fileDiff.deletions) deletions")
+        .accessibilityLabel("File diff for \(viewModel.fileDiff?.fileName ?? "")")
+        .accessibilityValue("\(viewModel.fileDiff?.additions ?? 0) additions, \(viewModel.fileDiff?.deletions ?? 0) deletions")
     }
 }
 
@@ -127,6 +167,8 @@ struct UnifiedDiffView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     let hunks: [DiffHunk]
+    var selectedHunkIds: Set<UUID> = []
+    var onHunkSelect: ((UUID) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -139,16 +181,33 @@ struct UnifiedDiffView: View {
                 }
 
                 HStack(spacing: Spacing.sm.rawValue) {
+                    // Selection checkbox
+                    if let onSelect = onHunkSelect {
+                        Button {
+                            onSelect(hunk.id)
+                        } label: {
+                            Image(systemName: selectedHunkIds.contains(hunk.id) ? "checkmark.square.fill" : "square")
+                                .foregroundColor(selectedHunkIds.contains(hunk.id) ? .accentPrimary : Color.fgTertiary(scheme: colorScheme))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     Text("@@ -\(hunk.oldStart),\(hunk.oldCount) +\(hunk.newStart),\(hunk.newCount) @@")
                         .font(.diffLineNumber)
                         .foregroundColor(Color.fgTertiary(scheme: colorScheme))
                         .padding(.horizontal, Spacing.xs.rawValue)
                         .background(Color.fgTertiary(scheme: colorScheme).opacity(0.1))
 
+                    // Change preview
+                    Text(hunk.changePreview)
+                        .font(.caption2)
+                        .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+
                     Spacer()
                 }
                 .padding(.horizontal, Spacing.md.rawValue)
                 .padding(.vertical, Spacing.xs.rawValue)
+                .background(selectedHunkIds.contains(hunk.id) ? Color.accentPrimary.opacity(0.1) : Color.clear)
 
                 // Lines
                 ForEach(hunk.lines) { line in
@@ -257,6 +316,8 @@ struct SideBySideDiffView: View {
     @Environment(\.colorScheme) private var colorScheme
 
     let hunks: [DiffHunk]
+    var selectedHunkIds: Set<UUID> = []
+    var onHunkSelect: ((UUID) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -281,6 +342,28 @@ struct SideBySideDiffView: View {
 
             // Content
             ForEach(Array(hunks.enumerated()), id: \.offset) { _, hunk in
+                // Hunk selection header
+                if let onSelect = onHunkSelect {
+                    HStack {
+                        Button {
+                            onSelect(hunk.id)
+                        } label: {
+                            Image(systemName: selectedHunkIds.contains(hunk.id) ? "checkmark.square.fill" : "square")
+                                .foregroundColor(selectedHunkIds.contains(hunk.id) ? .accentPrimary : Color.fgTertiary(scheme: colorScheme))
+                        }
+                        .buttonStyle(.plain)
+
+                        Text(hunk.changePreview)
+                            .font(.caption2)
+                            .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+
+                        Spacer()
+                    }
+                    .padding(.horizontal, Spacing.sm.rawValue)
+                    .padding(.vertical, Spacing.xs.rawValue)
+                    .background(selectedHunkIds.contains(hunk.id) ? Color.accentPrimary.opacity(0.1) : Color.clear)
+                }
+
                 ForEach(hunk.lines) { line in
                     SideBySideDiffLineView(line: line)
                 }
@@ -354,37 +437,96 @@ struct SideBySideDiffLineView: View {
 struct DiffActionsView: View {
     @Environment(\.colorScheme) private var colorScheme
 
+    @Bindable var viewModel: DiffViewModel
+    let onAccept: (() -> Void)?
+    let onReject: (() -> Void)?
+
+    init(
+        viewModel: DiffViewModel,
+        onAccept: (() -> Void)? = nil,
+        onReject: (() -> Void)? = nil
+    ) {
+        self.viewModel = viewModel
+        self.onAccept = onAccept
+        self.onReject = onReject
+    }
+
     var body: some View {
         HStack(spacing: Spacing.md.rawValue) {
-            Button(action: {}) {
-                Label("Accept", systemImage: "checkmark")
+            // Accept button
+            Button {
+                Task {
+                    let result = await viewModel.acceptAll()
+                    if case .success = result {
+                        onAccept?()
+                    }
+                }
+            } label: {
+                if viewModel.isProcessing {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                } else {
+                    Label("Accept", systemImage: "checkmark")
+                }
             }
             .buttonStyle(.primary)
+            .disabled(viewModel.isProcessing || viewModel.isAccepted || viewModel.isRejected)
             .accessibilityLabel("Accept changes")
             .accessibilityHint("Double tap to accept this diff")
 
-            Button(action: {}) {
+            // Reject button
+            Button {
+                Task {
+                    let result = await viewModel.rejectAll()
+                    if case .success = result {
+                        onReject?()
+                    }
+                }
+            } label: {
                 Label("Reject", systemImage: "xmark")
             }
             .buttonStyle(.secondary)
+            .disabled(viewModel.isProcessing || viewModel.isAccepted || viewModel.isRejected)
             .accessibilityLabel("Reject changes")
             .accessibilityHint("Double tap to reject this diff")
 
             Spacer()
 
-            Button("Accept All") {}
+            // Partial accept/reject (when hunks are selected)
+            if viewModel.hasSelectedHunks {
+                Button {
+                    Task {
+                        _ = await viewModel.acceptSelected()
+                    }
+                } label: {
+                    Text("Accept Selected (\(viewModel.selectedHunkIds.count))")
+                }
                 .buttonStyle(.plain)
                 .foregroundColor(Color.accentPrimary)
                 .font(.captionText)
-                .accessibilityLabel("Accept all changes")
-                .accessibilityHint("Double tap to accept all diffs in this file")
 
-            Button("Reject All") {}
+                Button {
+                    Task {
+                        _ = await viewModel.rejectSelected()
+                    }
+                } label: {
+                    Text("Reject Selected")
+                }
                 .buttonStyle(.plain)
                 .foregroundColor(.accentError)
                 .font(.captionText)
-                .accessibilityLabel("Reject all changes")
-                .accessibilityHint("Double tap to reject all diffs in this file")
+            }
+
+            // Status indicators
+            if viewModel.isAccepted {
+                Label("Accepted", systemImage: "checkmark.circle.fill")
+                    .foregroundColor(.accentSuccess)
+                    .font(.captionText)
+            } else if viewModel.isRejected {
+                Label("Rejected", systemImage: "xmark.circle.fill")
+                    .foregroundColor(Color.fgSecondary(scheme: colorScheme))
+                    .font(.captionText)
+            }
         }
         .padding(Spacing.md.rawValue)
         .background(Color.bgSecondary(scheme: colorScheme))
